@@ -60,6 +60,7 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
 
     rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region.value}/pc/{safe_name}/{safe_tag}"
     account_url = f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
+    matches_url = f"https://api.henrikdev.xyz/valorant/v4/matches/{region.value}/pc/{safe_name}/{safe_tag}?size=5"
 
     headers = {"Authorization": HENRICK_API_KEY}
     timeout = aiohttp.ClientTimeout(total=10)
@@ -76,13 +77,19 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
                 rank_payload = await response.json()
             async with session.get(account_url) as response:
                 if response.status != 200:
-                    await interaction.followup.send(f"I found the player's rank, but could not load their account level. Error {response.status}.")
+                    await interaction.followup.send(f"I found the player's, but could not load their account level. Error {response.status}.")
                     return
                 account_payload = await response.json()
+            async with session.get(matches_url) as response:
+                            if response.status != 200:
+                                await interaction.followup.send(f"I found the player's, but could not load their match history. Error {response.status}.")
+                                return
+                            matches_payload = await response.json()
     except aiohttp.ClientError as error:
         print(f"HenrikDev request failed: {type(error).__name__}: {error!r}")
         await interaction.followup.send("I could not reach the Valorant API. Please try again shortly")
         return
+
     
     rank_data = rank_payload["data"]               #all rank data
     account_data = account_payload["data"]         #all account data (level etc.)
@@ -90,11 +97,52 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
 
     player_data = rank_data["account"]                        #self explanatory
     player_level = account_data["account_level"]
+    player_puuid = player_data["puuid"]
     player_name = player_data["name"]
     player_tag = player_data["tag"]
     player_rank_info = rank_data["current"]
     player_rank = player_rank_info["tier"]["name"]
     player_rr = player_rank_info["rr"]
+
+    match_rows = []
+
+    for match in matches_payload["data"]:
+         all_players = match["players"]
+
+         matching_player = None
+
+         for player in all_players:
+              if player["puuid"] == player_puuid:
+                matching_player = player
+                break
+         if matching_player is None:
+              continue
+
+         player_team_id = matching_player["team_id"]
+
+         matching_team = None
+
+         for team in match["teams"]:
+            if team["team_id"] == player_team_id:
+                matching_team = team
+                break
+
+         if matching_team is None:
+            continue
+
+         match_win_status = "W" if matching_team["won"] else "L"
+
+         map_name = match["metadata"]["map"]["name"]
+         mode = match["metadata"]["queue"]["name"]
+         agent_name = matching_player["agent"]["name"]
+
+         stats = matching_player["stats"]
+         kills = stats["kills"]
+         deaths = stats["deaths"]
+         assists = stats["assists"]
+
+         row = f"{match_win_status:<2} {map_name[:10]:<10} {mode[:11]:<11} {agent_name[:9]:<9} {kills}/{deaths}/{assists}"
+         match_rows.append(row)
 
 
     embed = discord.Embed(
@@ -117,11 +165,19 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
                 inline = False,
             )
     embed.set_footer(text=f"{region.name} • PC")
+    if match_rows:
+        match_table = "\n".join(match_rows)
+    else:
+        match_table = "No recent matches found."
+
+    table_header = f"{'R':<2} {'Map':<10} {'Mode':<11} {'Agent':<9} KDA"
+
+    embed.add_field(
+        name="Recent Matches",
+        value=f"```{table_header}\n{match_table}```",
+        inline=False,
+    )
     await interaction.followup.send(embed=embed)
 
 
 bot.run(token=token)
-
-
-
-
