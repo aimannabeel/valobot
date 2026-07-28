@@ -59,6 +59,7 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
     safe_tag = quote(tag, safe="")
 
     rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region.value}/pc/{safe_name}/{safe_tag}"
+    account_url = f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
 
     headers = {"Authorization": HENRICK_API_KEY}
     timeout = aiohttp.ClientTimeout(total=10)
@@ -73,16 +74,25 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
                     await interaction.followup.send(f"Valorant API returned error {response.status}. Try again shortly")
                     return
                 rank_payload = await response.json()
+            async with session.get(account_url) as response:
+                if response.status != 200:
+                    await interaction.followup.send(f"I found the player's rank, but could not load their account level. Error {response.status}.")
+                    return
+                account_payload = await response.json()
     except aiohttp.ClientError as error:
         print(f"HenrikDev request failed: {type(error).__name__}: {error!r}")
         await interaction.followup.send("I could not reach the Valorant API. Please try again shortly")
         return
     
-    full_data = rank_payload["data"]
-    player_data = full_data["account"]
+    rank_data = rank_payload["data"]               #all rank data
+    account_data = account_payload["data"]         #all account data (level etc.)
+
+
+    player_data = rank_data["account"]                        #self explanatory
+    player_level = account_data["account_level"]
     player_name = player_data["name"]
     player_tag = player_data["tag"]
-    player_rank_info = full_data["current"]
+    player_rank_info = rank_data["current"]
     player_rank = player_rank_info["tier"]["name"]
     player_rr = player_rank_info["rr"]
 
@@ -101,6 +111,11 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
             value= f"{player_rr}",
             inline = False,
         )
+    embed.add_field(
+                name = "Level",
+                value= f"{player_level}",
+                inline = False,
+            )
     embed.set_footer(text=f"{region.name} • PC")
     await interaction.followup.send(embed=embed)
 
