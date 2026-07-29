@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 token = os.getenv("DISCORD_TOKEN")
 guildId = os.getenv("GUILD_ID")
-HENRICK_API_KEY = os.getenv("HENRICK_API_KEY")
+HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
 MODE_LABELS = {
@@ -30,8 +30,8 @@ if token is None:
 if guildId  is None:
     raise ValueError("GUILD_ID is missing from .env")
 
-if not HENRICK_API_KEY:
-    raise ValueError("HENRICK_API_KEY is missing from .env")
+if not HENRIK_API_KEY:
+    raise ValueError("HENRIK_API_KEY is missing from .env")
 
 
 TESTGUILD = discord.Object(id=int(guildId))
@@ -96,6 +96,14 @@ def build_match_table(matches_payload, player_puuid):
 
     return f"```{table_header}\n{match_table}```"
 
+def build_match_url(region_value, safe_name, safe_tag, mode="all"):
+    base_url = f"https://api.henrikdev.xyz/valorant/v4/matches/{region_value}/pc/{safe_name}/{safe_tag}"
+
+    if mode == "all":
+        return f"{base_url}?size=5"
+
+    return f"{base_url}?size=5&mode={mode}"
+
 class ModeSelect(discord.ui.Select):
     def __init__(self, player_name, player_tag, region, player_puuid, embed):
 
@@ -127,12 +135,9 @@ class ModeSelect(discord.ui.Select):
         safe_name = quote(self.player_name, safe ="")
         safe_tag = quote(self.player_tag, safe ="")
 
-        if selected_mode == "all":
-            matches_url = f"https://api.henrikdev.xyz/valorant/v4/matches/{self.region.value}/pc/{safe_name}/{safe_tag}?size=5"
-        else:
-            matches_url =f"https://api.henrikdev.xyz/valorant/v4/matches/{self.region.value}/pc/{safe_name}/{safe_tag}?size=5&mode={selected_mode}"
+        matches_url = build_match_url(self.region.value, safe_name, safe_tag, selected_mode)
 
-        headers = {"Authorization": HENRICK_API_KEY}
+        headers = {"Authorization": HENRIK_API_KEY}
         timeout = aiohttp.ClientTimeout(total=10)
         connector = aiohttp.TCPConnector(ssl=ssl_context)
 
@@ -199,9 +204,9 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
 
     rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region.value}/pc/{safe_name}/{safe_tag}"
     account_url = f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
-    matches_url = f"https://api.henrikdev.xyz/valorant/v4/matches/{region.value}/pc/{safe_name}/{safe_tag}?size=5"
+    matches_url = build_match_url(region.value, safe_name, safe_tag)
 
-    headers = {"Authorization": HENRICK_API_KEY}
+    headers = {"Authorization": HENRIK_API_KEY}
     timeout = aiohttp.ClientTimeout(total=10)
     connector = aiohttp.TCPConnector(ssl=ssl_context)
     try:
