@@ -154,7 +154,7 @@ class ModeSelect(discord.ui.Select):
                     matches_payload = await response.json()
         except aiohttp.ClientError:
             await interaction.followup.send(
-            "I could not reach the Valorant API. Please try again shortly.",
+            "Could not reach the Valorant API. Please try again shortly.",
             ephemeral=True,
         )
             return
@@ -212,7 +212,7 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
         async with aiohttp.ClientSession(headers=headers, timeout=timeout, connector=connector,) as session:
             async with session.get(rank_url) as response:
                 if response.status == 404:
-                    await interaction.followup.send("I could not find this player, try using region")
+                    await interaction.followup.send("Could not find this player. Check the name, tag and region.")
                     return
                 if response.status != 200:
                     await interaction.followup.send(f"Valorant API returned error {response.status}. Try again shortly")
@@ -220,17 +220,17 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
                 rank_payload = await response.json()
             async with session.get(account_url) as response:
                 if response.status != 200:
-                    await interaction.followup.send(f"I found the player's, but could not load their account level. Error {response.status}.")
+                    await interaction.followup.send(f"Found the player, but could not load their account level. Error {response.status}.")
                     return
                 account_payload = await response.json()
             async with session.get(matches_url) as response:
                             if response.status != 200:
-                                await interaction.followup.send(f"I found the player's, but could not load their match history. Error {response.status}.")
+                                await interaction.followup.send(f"Found the player, but could not load their match history. Error {response.status}.")
                                 return
                             matches_payload = await response.json()
     except aiohttp.ClientError as error:
         print(f"HenrikDev request failed: {type(error).__name__}: {error!r}")
-        await interaction.followup.send("I could not reach the Valorant API. Please try again shortly")
+        await interaction.followup.send("Could not reach the Valorant API. Please try again shortly")
         return
 
     
@@ -258,14 +258,14 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
             )
     embed.add_field(
         name = "Rank",
-        value= f"{player_rank}",
+        value= f"{player_rank}\n{player_rr}/100 rr",
         inline = True,
     )
-    embed.add_field(
-            name = "Current RR",
-            value= f"{player_rr}",
-            inline = True,
-        )
+    # embed.add_field(
+    #         name = "Current RR",
+    #         value= f"{player_rr}",
+    #         inline = True,
+    #     )
     embed.set_footer(text=f"{region.name} • PC")
 
     embed.add_field(
