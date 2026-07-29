@@ -14,6 +14,16 @@ guildId = os.getenv("GUILD_ID")
 HENRICK_API_KEY = os.getenv("HENRICK_API_KEY")
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
+MODE_LABELS = {
+    "all": "All",
+    "competitive": "Competitive",
+    "unrated": "Unrated",
+    "spikerush": "Spike Rush",
+    "teamdeathmatch": "Team Deathmatch",
+    "deathmatch": "Deathmatch",
+    "swiftplay": "Swiftplay",
+}
+
 if token is None:
     raise ValueError("DISCORD_TOKEN is missing from .env")
 
@@ -144,8 +154,16 @@ class ModeSelect(discord.ui.Select):
             ephemeral=True,
         )
             return
+        mode_label = MODE_LABELS[selected_mode]
 
-        self.embed.set_field_at(index = 3,name=f"Recent Matches: {selected_mode.title()}", value=build_match_table(matches_payload, self.player_puuid), inline=False,)
+        self.embed.set_field_at(
+            index = 3,
+            name=f"Recent {mode_label} Matches",
+            value=build_match_table(matches_payload, self.player_puuid),
+            inline=False,
+        )
+
+
         await interaction.message.edit(embed=self.embed, view=self.view)
                 
 
@@ -230,24 +248,24 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
         description= "Current Rank and info",
         color= discord.Color.red(), )
     embed.add_field(
+                name = "Level",
+                value= f"{player_level}",
+                inline = True,
+            )
+    embed.add_field(
         name = "Rank",
         value= f"{player_rank}",
-        inline = False,
+        inline = True,
     )
     embed.add_field(
             name = "Current RR",
             value= f"{player_rr}",
-            inline = False,
+            inline = True,
         )
-    embed.add_field(
-                name = "Level",
-                value= f"{player_level}",
-                inline = False,
-            )
     embed.set_footer(text=f"{region.name} • PC")
 
     embed.add_field(
-        name="Recent Matches",
+        name="All Recent Matches",
         value=build_match_table(matches_payload=matches_payload, player_puuid=player_puuid),
         inline=False,
     )
