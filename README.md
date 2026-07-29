@@ -102,12 +102,16 @@ python main.py
 - [x] Improve match display formatting
 - [ ] Test bot in a friend's Discord server
 - [ ] Clean up error handling
+- [ ] Add recent K/D calculation
+- [ ] Add recent headshot percentage
+- [ ] Add peak rank if available from the API
 
 ### Phase 1.5: Saved Player IDs
 
 - [ ] Save a Discord user's Valorant ID
 - [ ] Add shortcut command for checking saved stats
 - [ ] Store saved IDs safely in a local file or database
+- [ ] Add `/compare` command for comparing two players
 
 ### Phase 2: Add-On Features
 
