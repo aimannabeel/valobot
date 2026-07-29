@@ -36,6 +36,58 @@ async def on_ready():
     print(f"Logged in as {bot.user}")
     print(f"Synced {len(synced_commands)} slash command(s).")
 
+def build_match_table(matches_payload, player_puuid):
+    match_rows = []
+     
+    for match in matches_payload["data"]:
+        all_players = match["players"]
+     
+        matching_player = None
+     
+        for player in all_players:
+            if player["puuid"] == player_puuid:
+                matching_player = player
+                break
+        if matching_player is None:
+            continue
+     
+        player_team_id = matching_player["team_id"]
+     
+        matching_team = None
+     
+        for team in match["teams"]:
+            if team["team_id"] == player_team_id:
+                matching_team = team
+                break
+     
+        if matching_team is None:
+            continue
+     
+        match_win_status = "W" if matching_team["won"] else "L"
+     
+        map_name = match["metadata"]["map"]["name"]
+        mode = match["metadata"]["queue"]["name"]
+        agent_name = matching_player["agent"]["name"]
+     
+        stats = matching_player["stats"]
+        kills = stats["kills"]
+        deaths = stats["deaths"]
+        assists = stats["assists"]
+     
+        row = f"{match_win_status:<2} {map_name[:10]:<10} {mode[:11]:<11} {agent_name[:9]:<9} {kills}/{deaths}/{assists}"
+        match_rows.append(row)
+
+    table_header = f"{'R':<2} {'Map':<10} {'Mode':<11} {'Agent':<9} KDA"
+
+    if match_rows:
+        match_table = "\n".join(match_rows)
+    else:
+        match_table = "No recent matches found."
+
+    return f"```{table_header}\n{match_table}```"
+        
+     
+
 @bot.tree.command(
     name="valstats",
     description="Show a Valorant player's recent stats.",
@@ -104,45 +156,45 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
     player_rank = player_rank_info["tier"]["name"]
     player_rr = player_rank_info["rr"]
 
-    match_rows = []
+    # match_rows = []
 
-    for match in matches_payload["data"]:
-         all_players = match["players"]
+    # for match in matches_payload["data"]:
+    #      all_players = match["players"]
 
-         matching_player = None
+    #      matching_player = None
 
-         for player in all_players:
-              if player["puuid"] == player_puuid:
-                matching_player = player
-                break
-         if matching_player is None:
-              continue
+    #      for player in all_players:
+    #           if player["puuid"] == player_puuid:
+    #             matching_player = player
+    #             break
+    #      if matching_player is None:
+    #           continue
 
-         player_team_id = matching_player["team_id"]
+    #      player_team_id = matching_player["team_id"]
 
-         matching_team = None
+    #      matching_team = None
 
-         for team in match["teams"]:
-            if team["team_id"] == player_team_id:
-                matching_team = team
-                break
+    #      for team in match["teams"]:
+    #         if team["team_id"] == player_team_id:
+    #             matching_team = team
+    #             break
 
-         if matching_team is None:
-            continue
+    #      if matching_team is None:
+    #         continue
 
-         match_win_status = "W" if matching_team["won"] else "L"
+    #      match_win_status = "W" if matching_team["won"] else "L"
 
-         map_name = match["metadata"]["map"]["name"]
-         mode = match["metadata"]["queue"]["name"]
-         agent_name = matching_player["agent"]["name"]
+    #      map_name = match["metadata"]["map"]["name"]
+    #      mode = match["metadata"]["queue"]["name"]
+    #      agent_name = matching_player["agent"]["name"]
 
-         stats = matching_player["stats"]
-         kills = stats["kills"]
-         deaths = stats["deaths"]
-         assists = stats["assists"]
+    #      stats = matching_player["stats"]
+    #      kills = stats["kills"]
+    #      deaths = stats["deaths"]
+    #      assists = stats["assists"]
 
-         row = f"{match_win_status:<2} {map_name[:10]:<10} {mode[:11]:<11} {agent_name[:9]:<9} {kills}/{deaths}/{assists}"
-         match_rows.append(row)
+    #      row = f"{match_win_status:<2} {map_name[:10]:<10} {mode[:11]:<11} {agent_name[:9]:<9} {kills}/{deaths}/{assists}"
+    #      match_rows.append(row)
 
 
     embed = discord.Embed(
@@ -165,16 +217,16 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
                 inline = False,
             )
     embed.set_footer(text=f"{region.name} • PC")
-    if match_rows:
-        match_table = "\n".join(match_rows)
-    else:
-        match_table = "No recent matches found."
+    # if match_rows:
+    #     match_table = "\n".join(match_rows)
+    # else:
+    #     match_table = "No recent matches found."
 
-    table_header = f"{'R':<2} {'Map':<10} {'Mode':<11} {'Agent':<9} KDA"
+    # table_header = f"{'R':<2} {'Map':<10} {'Mode':<11} {'Agent':<9} KDA"
 
     embed.add_field(
         name="Recent Matches",
-        value=f"```{table_header}\n{match_table}```",
+        value=build_match_table(matches_payload=matches_payload, player_puuid=player_puuid),
         inline=False,
     )
     await interaction.followup.send(embed=embed)
