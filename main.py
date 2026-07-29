@@ -73,7 +73,7 @@ def build_match_table(matches_payload, player_puuid):
         if matching_team is None:
             continue
      
-        match_win_status = "W" if matching_team["won"] else "L"
+        match_win_status = "🟩 Victory" if matching_team["won"] else "🟥 Defeat"
      
         map_name = match["metadata"]["map"]["name"]
         mode = match["metadata"]["queue"]["name"]
@@ -84,17 +84,16 @@ def build_match_table(matches_payload, player_puuid):
         deaths = stats["deaths"]
         assists = stats["assists"]
      
-        row = f"{match_win_status:<2} {map_name[:10]:<10} {mode[:11]:<11} {agent_name[:9]:<9} {kills}/{deaths}/{assists}"
+        row = f"**{match_win_status} • {map_name}**\n {agent_name} • {mode} • {kills}/{deaths}/{assists}"
+
         match_rows.append(row)
 
-    table_header = f"{'R':<2} {'Map':<10} {'Mode':<11} {'Agent':<9} KDA"
 
     if match_rows:
-        match_table = "\n".join(match_rows)
+        return "\n\n".join(match_rows)
     else:
-        match_table = "No recent matches found."
+        return "No recent matches found."
 
-    return f"```{table_header}\n{match_table}```"
 
 def build_match_url(region_value, safe_name, safe_tag, mode="all"):
     base_url = f"https://api.henrikdev.xyz/valorant/v4/matches/{region_value}/pc/{safe_name}/{safe_tag}"
