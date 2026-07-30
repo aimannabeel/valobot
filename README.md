@@ -100,11 +100,11 @@ python main.py
 - [x] Show map, mode, agent, KDA, and win/loss result
 - [x] Add match mode dropdown
 - [x] Improve match display formatting
-- [ ] Test bot in a friend's Discord server
-- [ ] Clean up error handling
-- [ ] Add recent K/D calculation
-- [ ] Add recent headshot percentage
-- [ ] Add peak rank if available from the API
+- [x] Test bot in a friend's Discord server
+- [x] Clean up error handling
+- [x] Add recent K/D calculation
+- [x] Add recent headshot percentage
+- [x] Add peak rank if available from the API
 
 ### Phase 1.5: Saved Player IDs
 

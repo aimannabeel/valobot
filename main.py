@@ -1,5 +1,6 @@
 import os
 import aiohttp
+import asyncio
 from urllib.parse import quote
 import discord
 import ssl
@@ -34,7 +35,7 @@ if not HENRIK_API_KEY:
     raise ValueError("HENRIK_API_KEY is missing from .env")
 
 
-TESTGUILD = discord.Object(id=int(guildId))
+TESTGUILD = [discord.Object(id=int(guildIds.strip())) for guildIds in guildId.split(",")]
 
 intents =  discord.Intents.default()
 
@@ -42,8 +43,9 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 @bot.event
 async def on_ready():
-    synced_commands = await bot.tree.sync(guild=TESTGUILD)
     print(f"Logged in as {bot.user}")
+    for TESTGUILDS in TESTGUILD:
+        synced_commands = await bot.tree.sync(guild=TESTGUILDS)
     print(f"Synced {len(synced_commands)} slash command(s).")
 
 def build_match_table(matches_payload, player_puuid):
@@ -88,11 +90,52 @@ def build_match_table(matches_payload, player_puuid):
 
         match_rows.append(row)
 
-
     if match_rows:
         return "\n\n".join(match_rows)
     else:
         return "No recent matches found."
+
+def calculate_recent_stats(matches_payload, player_puuid):
+    total_kills = 0
+    total_deaths = 0
+    total_headshots = 0
+    total_bodyshots = 0
+    total_legshots = 0
+    matches_counted = 0
+
+    
+
+    for match in matches_payload["data"]:
+        all_players = match["players"]
+             
+        matching_player = None
+             
+        for player in all_players:
+            if player["puuid"] == player_puuid:
+                matching_player = player
+                break
+            if matching_player is None:
+                continue
+
+        stats = matching_player["stats"]
+
+        total_kills += stats["kills"]
+        total_deaths += stats["deaths"]
+        total_headshots += stats["headshots"]
+        total_bodyshots += stats["bodyshots"]
+        total_legshots += stats["legshots"]
+        matches_counted += 1
+
+    if matches_counted == 0:
+        return "No recent stats found."
+
+    kd = total_kills/total_deaths if total_deaths > 0 else total_kills
+
+    total_shots = total_headshots + total_bodyshots + total_legshots
+    hs_percent = (total_headshots/total_shots) * 100 if total_shots > 0 else 0
+
+    return f"K/D: {kd:.2f} • HS: {hs_percent:.1f}%"
+    
 
 
 def build_match_url(region_value, safe_name, safe_tag, mode="all"):
@@ -152,7 +195,7 @@ class ModeSelect(discord.ui.Select):
                         )
                         return
                     matches_payload = await response.json()
-        except aiohttp.ClientError:
+        except (aiohttp.ClientError, asyncio.TimeoutError) :
             await interaction.followup.send(
             "Could not reach the Valorant API. Please try again shortly.",
             ephemeral=True,
@@ -161,7 +204,7 @@ class ModeSelect(discord.ui.Select):
         mode_label = MODE_LABELS[selected_mode]
 
         self.embed.set_field_at(
-            index = 3,
+            index = 4,
             name=f"Recent {mode_label} Matches",
             value=build_match_table(matches_payload, self.player_puuid),
             inline=False,
@@ -184,7 +227,7 @@ class ModeView(discord.ui.View):
     description="Show a Valorant player's recent stats.",
 )
 
-@app_commands.guilds(TESTGUILD)
+@app_commands.guilds(*TESTGUILD)
 @app_commands.choices(
     region= [app_commands.Choice(name="Asia Pacific", value="ap"),
              app_commands.Choice(name="North America", value="na"),
@@ -204,7 +247,6 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
     rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region.value}/pc/{safe_name}/{safe_tag}"
     account_url = f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
     matches_url = build_match_url(region.value, safe_name, safe_tag)
-    mmr_url = f"https://api.henrikdev.xyz/valorant/v1/mmr/{region.value}/{safe_name}/{safe_tag}"
 
     headers = {"Authorization": HENRIK_API_KEY}
     timeout = aiohttp.ClientTimeout(total=10)
@@ -229,7 +271,7 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
                     await interaction.followup.send(f"Found the player, but could not load their match history. Error {response.status}.")
                     return
                 matches_payload = await response.json()
-    except aiohttp.ClientError as error:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
         print(f"HenrikDev request failed: {type(error).__name__}: {error!r}")
         await interaction.followup.send("Could not reach the Valorant API. Please try again shortly")
         return
@@ -246,11 +288,12 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
     player_tag = player_data["tag"]
     player_rank_info = rank_data["current"]
     player_rank = player_rank_info["tier"]["name"]
+    player_peak_rank = rank_data["peak"]["tier"]["name"]
     player_rr = player_rank_info["rr"]
 
     embed = discord.Embed(
         title=f"{player_name}#{player_tag}",
-        description= "Current Rank and info",
+        description= f"**Peak: {player_peak_rank}**",
         color= discord.Color.red(), )
     embed.add_field(
                 name = "Level",
@@ -258,14 +301,19 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
                 inline = True,
             )
     embed.add_field(
-        name = "Rank",
-        value= f"{player_rank}",
-        inline = True,
-            )
+        name="Rank",
+        value=f"{player_rank}",
+        inline=True,
+    )
     embed.add_field(
-            name = "Current RR",
-            value= f"{player_rr}",
-            inline = True,
+        name="Current RR",
+        value=f"{player_rr}",
+        inline=True,
+    )
+    embed.add_field(
+        name = "Recent Summary",
+        value= calculate_recent_stats(matches_payload, player_puuid),
+        inline = False,
             )
     embed.set_footer(text=f"{region.name} • PC")
 
