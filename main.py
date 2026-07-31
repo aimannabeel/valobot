@@ -3,6 +3,7 @@ import aiohttp
 import asyncio
 from urllib.parse import quote
 import discord
+import sqlite3
 import ssl
 import certifi
 from discord import app_commands
@@ -15,6 +16,67 @@ guildId = os.getenv("GUILD_ID")
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
+DATABASE_NAME = "valobot.db"
+
+def setup_db():
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS saved_players(
+        discord_user_id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        tag TEXT NOT NULL,
+        region TEXT NOT NULL
+    )
+""")
+
+    connection.commit()
+    connection.close()
+
+def save_player_id(discord_user_id, name, tag, region):
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+    cursor.execute("""
+        INSERT INTO saved_players (discord_user_id, name, tag, region)
+        VALUES(?,?,?,?)
+
+        ON CONFLICT(discord_user_id) DO UPDATE SET
+            name = excluded.name,
+            tag = excluded.tag,
+            region = excluded.region
+""", (discord_user_id, name, tag, region))
+
+    connection.commit()
+    connection.close()
+
+def get_saved_player_id(discord_user_id):
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """SELECT name, tag, region FROM saved_players WHERE discord_user_id = ?""",
+        (discord_user_id,)
+    )
+    saved_player = cursor.fetchone()
+
+    connection.close()
+
+    return saved_player
+
+def delete_player_id(discord_user_id):
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+    
+    cursor.execute(
+        """DELETE FROM saved_players WHERE discord_user_id = ?""", (discord_user_id,)
+    )
+
+    delete_count = cursor.rowcount
+
+    connection.commit()
+    connection.close()
+    return delete_count
+
 MODE_LABELS = {
     "all": "All",
     "competitive": "Competitive",
@@ -23,6 +85,15 @@ MODE_LABELS = {
     "teamdeathmatch": "Team Deathmatch",
     "deathmatch": "Deathmatch",
     "swiftplay": "Swiftplay",
+}
+
+REGION_LABELS = {
+    "ap": "Asia Pacific",
+    "na": "North America",
+    "eu": "Europe",
+    "kr": "Korea",
+    "latam": "Latin America",
+    "br": "Brazil",
 }
 
 if token is None:
@@ -331,5 +402,71 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
     )
     await interaction.followup.send(embed=embed, view=ModeView(player_name, player_tag, region, player_puuid, embed))
 
+@bot.tree.command(
+    name="setid",
+    description="Save your valorant ID for quick stat lookups."
+)
+@app_commands.guilds(*TESTGUILD)
+@app_commands.choices(
+    region= [app_commands.Choice(name="Asia Pacific", value="ap"),
+             app_commands.Choice(name="North America", value="na"),
+             app_commands.Choice(name="Europe", value="eu"),
+             app_commands.Choice(name="Korea", value="kr"),
+             app_commands.Choice(name="Latin America", value="latam"),
+             app_commands.Choice(name="Brazil", value="br"),
+        ]
+)
+async def setid(
+    interaction: discord.Interaction,
+    name:str,
+    tag: str,
+    region: app_commands.Choice[str]
+):
+    discord_user_id = str(interaction.user.id)
 
+    save_player_id(discord_user_id, name, tag, region.value)
+
+    await interaction.response.send_message(f"Set your Valorant ID **{name}#{tag}** in **{region.name}**.", ephemeral=True)
+
+@bot.tree.command(
+    name="myid",
+    description="View your saved Valorant ID"
+)
+
+@app_commands.guilds(*TESTGUILD)
+async def myid(interaction: discord.Interaction):
+    discord_user_id = str(interaction.user.id)
+
+    saved_player = get_saved_player_id(discord_user_id)
+
+    if saved_player == None:
+        await interaction.response.send_message("You do not have a saved Valorant ID yet. Use '/setid' first.", ephemeral=True)
+        return
+
+    name, tag, region = saved_player
+
+    region_label = REGION_LABELS[region]
+
+    await interaction.response.send_message(f"Your saved Valorant ID is **{name}#{tag}** in region **{region_label}**", ephemeral=True)
+
+@bot.tree.command(
+    name="unsetid",
+    description="Remove your saved Valorant ID"
+)
+@app_commands.guilds(*TESTGUILD)
+async def unsetid(interaction: discord.interactions):
+    saved_player_id = interaction.user.id
+
+    deleted_count = delete_player_id(saved_player_id)
+
+    if deleted_count ==0:
+        await interaction.response.send_message("You do not have a saved Valorant ID to remove.", ephemeral = True,)
+        return
+
+    await interaction.response.send_message("Removed you saved valorant ID.", ephemeral = True)
+
+    
+
+
+setup_db()
 bot.run(token=token)

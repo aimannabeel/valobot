@@ -8,10 +8,15 @@ I am building this project in phases while learning Python, Discord bots, APIs, 
 
 - `/valstats` slash command
 - Shows Valorant player level
-- Shows current rank and RR
+- Shows current rank, peak rank, and RR
 - Shows recent match history
+- Shows recent K/D and headshot percentage calculated from the last 5 matches
 - Displays map, mode, agent, KDA, and win/loss result
 - Dropdown menu for filtering match history by game mode
+- `/setid` command to link your Discord account with your Valorant ID
+- `/myid` command to view your linked Valorant ID
+- `/unsetid` command to unlink your saved Valorant ID from your Discord account
+- Uses SQLite for local saved-player storage
 - Uses Discord embeds for clean responses
 - Stores private tokens safely in a `.env` file which git ignores
 
@@ -27,12 +32,22 @@ The match history dropdown currently supports:
 - Deathmatch
 - Swiftplay
 
+## Commands
+
+| Command | Description |
+| --- | --- |
+| `/valstats` | Look up a Valorant player's stats using name, tag, and region |
+| `/setid` | Link your Discord account with Valorant ID for quicker lookups |
+| `/myid` | Show your linked Valorant ID |
+| `/unsetid` | Remove your linked Valorant ID |
+
 ## Tech Stack
 
 - Python
 - discord.py
 - aiohttp
 - python-dotenv
+- SQLite
 - HenrikDev Valorant API
 - Git
 - GitHub
@@ -72,6 +87,13 @@ HENRIK_API_KEY=your_henrik_api_key
 GUILD_ID=your_test_server_id
 ```
 
+The bot also creates a local SQLite database file:
+
+```text
+valobot.db
+```
+This file stores saved Valorant IDs and is ignored by Git.
+
 Run the bot:
 
 ```powershell
@@ -108,10 +130,13 @@ python main.py
 
 ### Phase 1.5: Saved Player IDs
 
-- [ ] Save a Discord user's Valorant ID
+- [x] Save a Discord user's Valorant ID
+- [x] Store saved IDs locally with SQLite
+- [x] Add `/setid` command
+- [x] Add `/myid` command
+- [x] Add `/unsetid` command
+- [ ] Add `/valstatsme` command for checking saved stats
 - [ ] Show how much RR gained or lost in the last 5 games
-- [ ] Add shortcut command for checking saved stats
-- [ ] Store saved IDs safely in a local file or database
 - [ ] Add `/compare` command for comparing two players
 
 ### Phase 2: Add-On Features
