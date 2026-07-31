@@ -218,11 +218,12 @@ def build_match_url(region_value, safe_name, safe_tag, mode="all"):
     return f"{base_url}?size=5&mode={mode}"
 
 class ModeSelect(discord.ui.Select):
-    def __init__(self, player_name, player_tag, region, player_puuid, embed):
+    def __init__(self, player_name, player_tag, region_value, region_name, player_puuid, embed):
 
         self.player_name = player_name
         self.player_tag = player_tag
-        self.region = region
+        self.region_value = region_value
+        self.region_name = region_name
         self.player_puuid = player_puuid
         self.embed = embed
         options = [
@@ -248,7 +249,7 @@ class ModeSelect(discord.ui.Select):
         safe_name = quote(self.player_name, safe ="")
         safe_tag = quote(self.player_tag, safe ="")
 
-        matches_url = build_match_url(self.region.value, safe_name, safe_tag, selected_mode)
+        matches_url = build_match_url(self.region_value, safe_name, safe_tag, selected_mode)
 
         headers = {"Authorization": HENRIK_API_KEY}
         timeout = aiohttp.ClientTimeout(total=10)
@@ -295,36 +296,19 @@ class ModeSelect(discord.ui.Select):
         
 
 class ModeView(discord.ui.View):
-    def __init__(self, player_name, player_tag, region, player_puuid, embed):
+    def __init__(self, player_name, player_tag, region_value, region_name, player_puuid, embed):
         super().__init__(timeout=120)
-        self.add_item(ModeSelect(player_name, player_tag, region, player_puuid, embed))
+        self.add_item(ModeSelect(player_name, player_tag, region_value, region_name, player_puuid, embed))
 
-
-@bot.tree.command(
-    name="valstats",
-    description="Show a Valorant player's recent stats.",
-)
-
-@app_commands.guilds(*TESTGUILD)
-@app_commands.choices(
-    region= [app_commands.Choice(name="Asia Pacific", value="ap"),
-             app_commands.Choice(name="North America", value="na"),
-             app_commands.Choice(name="Europe", value="eu"),
-             app_commands.Choice(name="Korea", value="kr"),
-             app_commands.Choice(name="Latin America", value="latam"),
-             app_commands.Choice(name="Brazil", value="br"),
-        ]
-)
-
-async def valstat(interaction: discord.Interaction, name: str, tag: str, region: app_commands.Choice[str],):
+async def send_valstats(interaction, name, tag, region_value, region_name):
     await interaction.response.defer(thinking=True)
 
     safe_name = quote(name, safe="")
     safe_tag = quote(tag, safe="")
 
-    rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region.value}/pc/{safe_name}/{safe_tag}"
+    rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
     account_url = f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
-    matches_url = build_match_url(region.value, safe_name, safe_tag)
+    matches_url = build_match_url(region_value, safe_name, safe_tag)
 
     headers = {"Authorization": HENRIK_API_KEY}
     timeout = aiohttp.ClientTimeout(total=10)
@@ -393,14 +377,33 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
         value= calculate_recent_stats(matches_payload, player_puuid),
         inline = False,
             )
-    embed.set_footer(text=f"{region.name} • PC")
+    embed.set_footer(text=f"{region_name} • PC")
 
     embed.add_field(
         name="All Recent Matches",
         value=build_match_table(matches_payload=matches_payload, player_puuid=player_puuid),
         inline=False,
     )
-    await interaction.followup.send(embed=embed, view=ModeView(player_name, player_tag, region, player_puuid, embed))
+    await interaction.followup.send(embed=embed, view=ModeView(player_name, player_tag, region_value, region_name, player_puuid, embed))
+
+@bot.tree.command(
+    name="valstats",
+    description="Show a Valorant player's recent stats.",
+)
+
+@app_commands.guilds(*TESTGUILD)
+@app_commands.choices(
+    region= [app_commands.Choice(name="Asia Pacific", value="ap"),
+             app_commands.Choice(name="North America", value="na"),
+             app_commands.Choice(name="Europe", value="eu"),
+             app_commands.Choice(name="Korea", value="kr"),
+             app_commands.Choice(name="Latin America", value="latam"),
+             app_commands.Choice(name="Brazil", value="br"),
+        ]
+)
+
+async def valstat(interaction: discord.Interaction, name: str, tag: str, region: app_commands.Choice[str],):
+    await send_valstats(interaction, name, tag, region.value, region.name)
 
 @bot.tree.command(
     name="setid",
@@ -454,7 +457,7 @@ async def myid(interaction: discord.Interaction):
     description="Remove your saved Valorant ID"
 )
 @app_commands.guilds(*TESTGUILD)
-async def unsetid(interaction: discord.interactions):
+async def unsetid(interaction: discord.Interactions):
     saved_player_id = interaction.user.id
 
     deleted_count = delete_player_id(saved_player_id)
@@ -465,6 +468,49 @@ async def unsetid(interaction: discord.interactions):
 
     await interaction.response.send_message("Removed you saved valorant ID.", ephemeral = True)
 
+@bot.tree.command(
+    name="valstatme",
+    description="Show stats for your saved Valorant ID."
+)
+@app_commands.guilds(*TESTGUILD)
+async def valstatsme(interaction: discord.Interaction):
+    discord_user_id = str(interaction.user.id)
+
+    saved_player = get_saved_player_id(discord_user_id)
+
+    if saved_player is None:
+        await interaction.response.send_message(
+            "You do not have a saved Valorant ID yet. Use `/setid` first.",
+            ephemeral=True,
+        )
+        return
+
+    name, tag, region = saved_player
+    region_name = REGION_LABELS[region]
+
+    await send_valstats(interaction, name, tag, region, region_name)
+
+@bot.tree.command(
+    name = "valstatsuser",
+    description="Show stats for Discord user's if they have linked Valorant ID."
+)
+@app_commands.guilds(*TESTGUILD)
+async def valstatuser(interaction: discord.Interaction, user: discord.User):
+    discord_user_id = str(user.id)
+
+    saved_player = get_saved_player_id(discord_user_id)
+
+    if saved_player is None:
+        await interaction.response.send_message(
+            f"{user.mention} does not have a linked Valorant ID yet.",
+            ephemeral=True
+        )
+        return
+
+    name, tag, region = saved_player
+    region_name = REGION_LABELS[region]
+
+    await send_valstats(interaction, name, tag, region, region_name)
     
 
 

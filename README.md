@@ -16,6 +16,8 @@ I am building this project in phases while learning Python, Discord bots, APIs, 
 - `/setid` command to link your Discord account with your Valorant ID
 - `/myid` command to view your linked Valorant ID
 - `/unsetid` command to unlink your saved Valorant ID from your Discord account
+- `/valstatsme` command to look up stats using your linked Valorant ID
+- `/valstatsuser` command to look up another Discord user's linked Valorant ID
 - Uses SQLite for local saved-player storage
 - Uses Discord embeds for clean responses
 - Stores private tokens safely in a `.env` file which git ignores
@@ -37,9 +39,11 @@ The match history dropdown currently supports:
 | Command | Description |
 | --- | --- |
 | `/valstats` | Look up a Valorant player's stats using name, tag, and region |
-| `/setid` | Link your Discord account with Valorant ID for quicker lookups |
+| `/setid` | Link your Discord account Valorant ID for quicker lookups |
 | `/myid` | Show your linked Valorant ID |
 | `/unsetid` | Remove your linked Valorant ID |
+| `/valstatsme` | Look up your stats using your linked Valorant ID |
+| `/valstatsuser` | Look up another Discord user's stats if they linked their Valorant ID |
 
 ## Tech Stack
 
@@ -84,7 +88,7 @@ Create a `.env` file in the project folder:
 ```env
 DISCORD_TOKEN=your_discord_bot_token
 HENRIK_API_KEY=your_henrik_api_key
-GUILD_ID=your_test_server_id
+GUILD_ID=your_test_server_id, your_friend_server_id (or more)
 ```
 
 The bot also creates a local SQLite database file:
@@ -135,7 +139,8 @@ python main.py
 - [x] Add `/setid` command
 - [x] Add `/myid` command
 - [x] Add `/unsetid` command
-- [ ] Add `/valstatsme` command for checking saved stats
+- [x] Add `/valstatsme` command for checking saved stats
+- [x] Add `/valstatsuser` command for checking another user's saved stats
 - [ ] Show how much RR gained or lost in the last 5 games
 - [ ] Add `/compare` command for comparing two players
 
