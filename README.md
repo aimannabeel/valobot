@@ -109,6 +109,7 @@ python main.py
 ### Phase 1.5: Saved Player IDs
 
 - [ ] Save a Discord user's Valorant ID
+- [ ] Show how much RR gained or lost in the last 5 games
 - [ ] Add shortcut command for checking saved stats
 - [ ] Store saved IDs safely in a local file or database
 - [ ] Add `/compare` command for comparing two players

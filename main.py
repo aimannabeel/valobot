@@ -114,8 +114,8 @@ def calculate_recent_stats(matches_payload, player_puuid):
             if player["puuid"] == player_puuid:
                 matching_player = player
                 break
-            if matching_player is None:
-                continue
+        if matching_player is None:
+            continue
 
         stats = matching_player["stats"]
 
@@ -202,6 +202,13 @@ class ModeSelect(discord.ui.Select):
         )
             return
         mode_label = MODE_LABELS[selected_mode]
+
+        self.embed.set_field_at(
+            index = 3,
+            name=f"{mode_label} Summary",
+            value= calculate_recent_stats(matches_payload, self.player_puuid),
+            inline = False
+        )
 
         self.embed.set_field_at(
             index = 4,
