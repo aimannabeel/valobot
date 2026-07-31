@@ -457,8 +457,8 @@ async def myid(interaction: discord.Interaction):
     description="Remove your saved Valorant ID"
 )
 @app_commands.guilds(*TESTGUILD)
-async def unsetid(interaction: discord.Interactions):
-    saved_player_id = interaction.user.id
+async def unsetid(interaction: discord.Interaction):
+    saved_player_id = str(interaction.user.id)
 
     deleted_count = delete_player_id(saved_player_id)
 
