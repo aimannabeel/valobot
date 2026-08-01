@@ -488,7 +488,7 @@ async def unsetid(interaction: discord.Interaction):
     await interaction.response.send_message("Removed you saved valorant ID.", ephemeral = True)
 
 @bot.tree.command(
-    name="valstatme",
+    name="valstatsme",
     description="Show stats for your saved Valorant ID."
 )
 @app_commands.guilds(*TESTGUILD)
@@ -530,6 +530,51 @@ async def valstatuser(interaction: discord.Interaction, user: discord.User):
     region_name = REGION_LABELS[region]
 
     await send_valstats(interaction, name, tag, region, region_name)
+
+@bot.tree.command(
+    name = "help",
+    description="Show all Valobot commands."
+)
+
+@app_commands.guilds(*TESTGUILD)
+async def help_command(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="Valobot Commands",
+        description="Quick guide to the available commands.",
+        color=discord.Color.red(),
+    )
+    embed.add_field(
+        name="/valstatsme",
+        value="Show stats using your linked Valorant ID.",
+        inline=False,
+    )
+    embed.add_field(
+        name="/valstatsuser",
+        value="Show stats for another Discord user's linked Valorant ID.",
+        inline=False,
+    )
+    embed.add_field(
+        name="/valstats",
+        value="Look up a Valorant player using name, tag, and region.",
+        inline=False,
+    )
+    embed.add_field(
+        name="/setid",
+        value="Link your Discord account with your Valorant ID.",
+        inline=False,
+    )
+    embed.add_field(
+        name="/myid",
+        value="Show your linked Valorant ID.",
+        inline=False,
+    )
+    embed.add_field(
+        name="/unsetid",
+        value="Remove your linked Valorant ID.",
+        inline=False,
+    )
+
+    await interaction.response.send_message(embed=embed, ephemeral=True)
     
 
 
