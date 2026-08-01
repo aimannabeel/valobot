@@ -206,6 +206,18 @@ def calculate_recent_stats(matches_payload, player_puuid):
     hs_percent = (total_headshots/total_shots) * 100 if total_shots > 0 else 0
 
     return f"K/D: {kd:.2f} • HS: {hs_percent:.1f}%"
+
+def calculate_recent_rr_change(mmr_history_payload):
+    history = mmr_history_payload["data"]["history"]
+
+    recent_games = history[:5]
+
+    total_rr_change = 0
+
+    for game in recent_games:
+        total_rr_change += game["last_change"]
+
+    return total_rr_change
     
 
 
@@ -309,6 +321,7 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
     rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
     account_url = f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
     matches_url = build_match_url(region_value, safe_name, safe_tag)
+    mmr_history_url = f"https://api.henrikdev.xyz/valorant/v2/mmr-history/{region_value}/pc/{safe_name}/{safe_tag}"
 
     headers = {"Authorization": HENRIK_API_KEY}
     timeout = aiohttp.ClientTimeout(total=10)
@@ -333,6 +346,12 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
                     await interaction.followup.send(f"Found the player, but could not load their match history. Error {response.status}.")
                     return
                 matches_payload = await response.json()
+            async with session.get(mmr_history_url) as response:
+                if response.status != 200:
+                    await interaction.followup.send(f"Found the player, but could not load their RR history. Error {response.status}.")
+                    return
+                mmr_history_payload = await response.json()
+
     except (aiohttp.ClientError, asyncio.TimeoutError) as error:
         print(f"HenrikDev request failed: {type(error).__name__}: {error!r}")
         await interaction.followup.send("Could not reach the Valorant API. Please try again shortly")
@@ -341,7 +360,6 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
     
     rank_data = rank_payload["data"]               #all rank data
     account_data = account_payload["data"]         #all account data (level etc.)
-
 
     player_data = rank_data["account"]                        #self explanatory
     player_level = account_data["account_level"]
@@ -352,6 +370,7 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
     player_rank = player_rank_info["tier"]["name"]
     player_peak_rank = rank_data["peak"]["tier"]["name"]
     player_rr = player_rank_info["rr"]
+    recent_rr_change = calculate_recent_rr_change(mmr_history_payload)
 
     embed = discord.Embed(
         title=f"{player_name}#{player_tag}",
@@ -369,7 +388,7 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
     )
     embed.add_field(
         name="Current RR",
-        value=f"{player_rr}",
+        value=f"{player_rr} ({recent_rr_change:+})",
         inline=True,
     )
     embed.add_field(
