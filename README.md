@@ -149,7 +149,7 @@ python main.py
 - [x] Show how much RR gained or lost in the last 5 games
 - [x] Add `/help` command
 - [x] Add `/compare` command for comparing two players
-- [] Deploy the bot publicly (Oracle Cloud VPS)
+- [ ] Deploy the bot publicly (Oracle Cloud VPS)
 
 ### Phase 2: Add-On Features
 

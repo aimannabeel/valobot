@@ -143,6 +143,10 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+
+    await bot.change_presence(
+        activity=discord.Game("/help")
+    )
     for TESTGUILDS in TESTGUILD:
         synced_commands = await bot.tree.sync(guild=TESTGUILDS)
     print(f"Synced {len(synced_commands)} slash command(s).")
@@ -734,7 +738,7 @@ async def help_command(interaction: discord.Interaction):
         description="Quick guide to the available commands.",
         color=discord.Color.red(),
     )
-    
+
     embed.add_field(
         name="/valstatsme",
         value="Show stats using your linked Valorant ID.",
