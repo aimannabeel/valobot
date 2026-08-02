@@ -18,6 +18,7 @@ I am building this project in phases while learning Python, Discord bots, APIs, 
 - `/unsetid` command to unlink your saved Valorant ID from your Discord account
 - `/valstatsme` command to look up stats using your linked Valorant ID
 - `/valstatsuser` command to look up another Discord user's linked Valorant ID
+- `/compare` command to compare two linked players using recent competitive stats
 - `/help` command to show available bot commands
 - Shows recent RR gain/loss from competitive matches
 - Uses SQLite for local saved-player storage
@@ -46,6 +47,7 @@ The match history dropdown currently supports:
 | `/unsetid` | Remove your linked Valorant ID |
 | `/valstatsme` | Look up your stats using your linked Valorant ID |
 | `/valstatsuser` | Look up another Discord user's stats if they linked their Valorant ID |
+| `/compare` | Compare two linked Valorant players using recent competitive rank, RR change, record, K/D, and headshot percentage |
 | `/help` | Show a quick guide to Valobot commands |
 
 ## Tech Stack
@@ -146,7 +148,8 @@ python main.py
 - [x] Add `/valstatsuser` command for checking another user's saved stats
 - [x] Show how much RR gained or lost in the last 5 games
 - [x] Add `/help` command
-- [ ] Add `/compare` command for comparing two players
+- [x] Add `/compare` command for comparing two players
+- [] Deploy the bot publicly (Oracle Cloud VPS)
 
 ### Phase 2: Add-On Features
 
@@ -155,7 +158,7 @@ python main.py
 
 ### Phase 3: AI Features
 
-- [ ] Use match stats as context for AI responses
+- [ ] Use match stats as context for AI responses or something (not sure)
 
 ### Future Polish
 

@@ -95,6 +95,34 @@ REGION_LABELS = {
     "latam": "Latin America",
     "br": "Brazil",
 }
+RANK_VALUES = {
+    "Unranked": 0,
+    "Iron 1": 1,
+    "Iron 2": 2,
+    "Iron 3": 3,
+    "Bronze 1": 4,
+    "Bronze 2": 5,
+    "Bronze 3": 6,
+    "Silver 1": 7,
+    "Silver 2": 8,
+    "Silver 3": 9,
+    "Gold 1": 10,
+    "Gold 2": 11,
+    "Gold 3": 12,
+    "Platinum 1": 13,
+    "Platinum 2": 14,
+    "Platinum 3": 15,
+    "Diamond 1": 16,
+    "Diamond 2": 17,
+    "Diamond 3": 18,
+    "Ascendant 1": 19,
+    "Ascendant 2": 20,
+    "Ascendant 3": 21,
+    "Immortal 1": 22,
+    "Immortal 2": 23,
+    "Immortal 3": 24,
+    "Radiant": 25,
+}
 
 if token is None:
     raise ValueError("DISCORD_TOKEN is missing from .env")
@@ -207,6 +235,77 @@ def calculate_recent_stats(matches_payload, player_puuid):
 
     return f"K/D: {kd:.2f} • HS: {hs_percent:.1f}%"
 
+def calculate_recent_match_stats(matches_payload, player_puuid):
+    total_kills = 0
+    total_deaths = 0
+    total_headshots = 0 
+    total_bodyshots = 0
+    total_legshots = 0
+    wins = 0
+    losses = 0
+    matches_counted = 0
+
+    for match in matches_payload["data"]:
+        all_players = match["players"]
+
+        matching_player = None
+
+        for player in all_players:
+            if player["puuid"] == player_puuid:
+                matching_player = player
+                break
+
+        if matching_player is None:
+            continue
+
+        player_team_id = matching_player["team_id"]
+
+        matching_team = None
+
+        for team in match["teams"]:
+            if team["team_id"] == player_team_id:
+                matching_team = team
+                break
+
+        if matching_team is None:
+            continue
+
+        if matching_team["won"]:
+            wins+=1
+        else:
+            losses += 1
+
+        stats = matching_player["stats"]
+        total_kills += stats["kills"]
+        total_deaths += stats["deaths"]
+        total_headshots += stats["headshots"]
+        total_bodyshots += stats["bodyshots"]
+        total_legshots += stats["legshots"]
+        matches_counted += 1
+
+    if matches_counted == 0:
+        return {
+            "kd": 0,
+            "hs_percent": 0,
+            "wins": 0,
+            "losses": 0,
+            "matches_counted": 0,
+    }    
+
+    kd = total_kills / total_deaths if total_deaths > 0 else total_kills
+
+    total_shots = total_headshots + total_bodyshots + total_legshots
+    hs_percent = (total_headshots / total_shots) * 100 if total_shots > 0 else 0
+
+    return {
+        "kd": kd,
+        "hs_percent": hs_percent,
+        "wins": wins,
+        "losses": losses,
+        "matches_counted": matches_counted,
+    }
+
+
 def calculate_recent_rr_change(mmr_history_payload):
     history = mmr_history_payload["data"]["history"]
 
@@ -228,6 +327,98 @@ def build_match_url(region_value, safe_name, safe_tag, mode="all"):
         return f"{base_url}?size=5"
 
     return f"{base_url}?size=5&mode={mode}"
+
+async def fetch_compare_data(name, tag, region_value):
+    safe_name = quote(name, safe="")
+    safe_tag = quote(tag, safe="")
+
+    rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
+    matches_url = build_match_url(region_value, safe_name, safe_tag, "competitive")
+    mmr_history_url = f"https://api.henrikdev.xyz/valorant/v2/mmr-history/{region_value}/pc/{safe_name}/{safe_tag}"
+
+    headers = {"Authorization": HENRIK_API_KEY}
+    timeout = aiohttp.ClientTimeout(total=10)
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+    async with aiohttp.ClientSession(headers=headers, timeout=timeout, connector=connector,) as session:
+        async with session.get(rank_url) as response:
+            if response.status != 200:
+                return None
+            rank_payload = await response.json()
+        async with session.get(matches_url) as response:
+            if response.status != 200:
+                return None
+            matches_payload = await response.json()
+        async with session.get(mmr_history_url) as response:
+            if response.status != 200:
+                return None
+            mmr_history_payload = await response.json()
+
+    rank_data = rank_payload["data"]
+    player_data = rank_data["account"]
+    player_puuid = player_data["puuid"]
+
+    player_rank_info = rank_data["current"]
+    player_rank = player_rank_info["tier"]["name"]
+    player_rr = player_rank_info["rr"]
+
+    recent_match_stats = calculate_recent_match_stats(matches_payload, player_puuid)
+    recent_rr_change = calculate_recent_rr_change(mmr_history_payload)
+
+    return {
+        "name": player_data["name"],
+        "tag": player_data["tag"],
+        "rank": player_rank,
+        "rr": player_rr,
+        "rr_change": recent_rr_change,
+        "kd": recent_match_stats["kd"],
+        "hs_percent": recent_match_stats["hs_percent"],
+        "wins": recent_match_stats["wins"],
+        "losses": recent_match_stats["losses"],
+        "matches_counted": recent_match_stats["matches_counted"],
+    }
+
+def build_compare_verdict(player1, player2, user1, user2):
+    player1_score = 0
+    player2_score = 0
+
+    player1_rank = RANK_VALUES.get(player1["rank"], 0)
+    player2_rank = RANK_VALUES.get(player2["rank"], 0)
+
+    if player1_rank > player2_rank:
+        player1_score += 1
+    elif player2_rank > player1_rank:
+        player2_score += 1
+    if player1["kd"] > player2["kd"]:
+        player1_score += 1
+    elif player2["kd"] > player1["kd"]:
+        player2_score += 1
+
+    if player1["hs_percent"] > player2["hs_percent"]:
+        player1_score += 1
+    elif player2["hs_percent"] > player1["hs_percent"]:
+        player2_score += 1
+
+    if player1["wins"] > player2["wins"]:
+        player1_score += 1
+    elif player2["wins"] > player1["wins"]:
+        player2_score += 1
+
+    if player1["rr_change"] > player2["rr_change"]:
+        player1_score += 1
+    elif player2["rr_change"] > player1["rr_change"]:
+        player2_score += 1
+
+    if player1_score > player2_score:
+        return f"Someone check {user1.mention}'s aimlabs hours. get rekt {user2.mention}"
+
+    if player2_score > player1_score:
+        return f"{user2.mention} ez win get clapped {user1.mention}. "
+
+    return "This one is too close to call. Run it back and settle it in ranked."
+
+
+    
 
 class ModeSelect(discord.ui.Select):
     def __init__(self, player_name, player_tag, region_value, region_name, player_puuid, embed):
@@ -543,38 +734,134 @@ async def help_command(interaction: discord.Interaction):
         description="Quick guide to the available commands.",
         color=discord.Color.red(),
     )
+    
     embed.add_field(
         name="/valstatsme",
         value="Show stats using your linked Valorant ID.",
         inline=False,
     )
+
     embed.add_field(
         name="/valstatsuser",
         value="Show stats for another Discord user's linked Valorant ID.",
         inline=False,
     )
+
     embed.add_field(
         name="/valstats",
         value="Look up a Valorant player using name, tag, and region.",
         inline=False,
     )
+    
     embed.add_field(
         name="/setid",
         value="Link your Discord account with your Valorant ID.",
         inline=False,
     )
+
     embed.add_field(
         name="/myid",
         value="Show your linked Valorant ID.",
         inline=False,
     )
+
     embed.add_field(
         name="/unsetid",
         value="Remove your linked Valorant ID.",
         inline=False,
     )
 
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    embed.add_field(
+    name="/compare",
+    value="Compare two linked Valorant players using recent competitive stats.",
+    inline=False,
+)
+
+    await interaction.response.send_message(embed=embed, ephemeral=False)
+
+@bot.tree.command(
+    name = "compare",
+    description  = "Compare two linked Valorant players."
+)
+
+@app_commands.guilds(*TESTGUILD)
+async def compare(interaction: discord.Interaction, user1: discord.User, user2: discord.User):
+    await interaction.response.defer(thinking=True)
+
+    saved_player1 = get_saved_player_id(str(user1.id))
+    saved_player2 = get_saved_player_id(str(user2.id))
+
+    if saved_player1 is None:
+        await interaction.followup.send(
+            f"{user1.mention} has not linked a Valorant ID yet. Ask them to use `/setid` first.",
+            ephemeral=True,
+        )
+        return
+
+    if saved_player2 is None:
+        await interaction.followup.send(
+            f"{user2.mention} has not linked a Valorant ID yet. Ask them to use `/setid` first.",
+            ephemeral=True,
+        )
+        return
+
+    name1, tag1, region1 = saved_player1
+    name2, tag2, region2 = saved_player2
+
+    player1 = await fetch_compare_data(name1, tag1, region1)
+    player2 = await fetch_compare_data(name2, tag2, region2)
+
+    if player1 is None or player2 is None:
+        await interaction.followup.send(
+            "Could not load compare stats. Try again shortly.",
+            ephemeral=True,
+        )
+        return
+
+    embed = discord.Embed(
+        title=f"{player1['name']}#{player1['tag']} vs {player2['name']}#{player2['tag']}",
+        description="Based on each player's last 5 competitive matches.",
+        color=discord.Color.red(),
+    )
+
+    embed.add_field(
+        name ="Rank",
+        value =f"{player1['rank']} vs {player2['rank']}",
+        inline = False
+    )
+
+    embed.add_field(
+        name = "Recent RR Change",
+        value = f"{player1['rr_change']:+} vs {player2['rr_change']:+}",
+        inline = False
+    )
+
+    embed.add_field(
+            name ="Recent Record",
+            value =f"{player1['wins']}W-{player1['losses']}L vs {player2['wins']}W-{player2['losses']}L",
+            inline = False
+        )
+
+    embed.add_field(
+        name="Recent K/D",
+        value=f"{player1['kd']:.2f} vs {player2['kd']:.2f}",
+        inline=False,
+    )
+
+    embed.add_field(
+        name="Headshot %",
+        value=f"{player1['hs_percent']:.1f}% vs {player2['hs_percent']:.1f}%",
+        inline=False,
+    )
+
+    embed.add_field(
+        name="Verdict",
+        value=build_compare_verdict(player1, player2, user1, user2),
+        inline=False,
+    )
+
+    await interaction.followup.send(embed=embed)
+
     
 
 
