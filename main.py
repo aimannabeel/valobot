@@ -12,7 +12,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 token = os.getenv("DISCORD_TOKEN")
-guildId = os.getenv("GUILD_ID")
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 ssl_context = ssl.create_default_context(cafile=certifi.where())
 
@@ -127,14 +126,8 @@ RANK_VALUES = {
 if token is None:
     raise ValueError("DISCORD_TOKEN is missing from .env")
 
-if guildId  is None:
-    raise ValueError("GUILD_ID is missing from .env")
-
 if not HENRIK_API_KEY:
     raise ValueError("HENRIK_API_KEY is missing from .env")
-
-
-TESTGUILD = [discord.Object(id=int(guildIds.strip())) for guildIds in guildId.split(",")]
 
 intents =  discord.Intents.default()
 
@@ -147,8 +140,7 @@ async def on_ready():
     await bot.change_presence(
         activity=discord.Game("/help")
     )
-    for TESTGUILDS in TESTGUILD:
-        synced_commands = await bot.tree.sync(guild=TESTGUILDS)
+    synced_commands = await bot.tree.sync()
     print(f"Synced {len(synced_commands)} slash command(s).")
 
 def build_match_table(matches_payload, player_puuid):
@@ -605,7 +597,6 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
     description="Show a Valorant player's recent stats.",
 )
 
-@app_commands.guilds(*TESTGUILD)
 @app_commands.choices(
     region= [app_commands.Choice(name="Asia Pacific", value="ap"),
              app_commands.Choice(name="North America", value="na"),
@@ -623,7 +614,6 @@ async def valstat(interaction: discord.Interaction, name: str, tag: str, region:
     name="setid",
     description="Save your valorant ID for quick stat lookups."
 )
-@app_commands.guilds(*TESTGUILD)
 @app_commands.choices(
     region= [app_commands.Choice(name="Asia Pacific", value="ap"),
              app_commands.Choice(name="North America", value="na"),
@@ -650,7 +640,6 @@ async def setid(
     description="View your saved Valorant ID"
 )
 
-@app_commands.guilds(*TESTGUILD)
 async def myid(interaction: discord.Interaction):
     discord_user_id = str(interaction.user.id)
 
@@ -670,7 +659,6 @@ async def myid(interaction: discord.Interaction):
     name="unsetid",
     description="Remove your saved Valorant ID"
 )
-@app_commands.guilds(*TESTGUILD)
 async def unsetid(interaction: discord.Interaction):
     saved_player_id = str(interaction.user.id)
 
@@ -686,7 +674,6 @@ async def unsetid(interaction: discord.Interaction):
     name="valstatsme",
     description="Show stats for your saved Valorant ID."
 )
-@app_commands.guilds(*TESTGUILD)
 async def valstatsme(interaction: discord.Interaction):
     discord_user_id = str(interaction.user.id)
 
@@ -708,7 +695,6 @@ async def valstatsme(interaction: discord.Interaction):
     name = "valstatsuser",
     description="Show stats for Discord user's if they have linked Valorant ID."
 )
-@app_commands.guilds(*TESTGUILD)
 async def valstatuser(interaction: discord.Interaction, user: discord.User):
     discord_user_id = str(user.id)
 
@@ -731,7 +717,6 @@ async def valstatuser(interaction: discord.Interaction, user: discord.User):
     description="Show all Valobot commands."
 )
 
-@app_commands.guilds(*TESTGUILD)
 async def help_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Valobot Commands",
@@ -788,7 +773,6 @@ async def help_command(interaction: discord.Interaction):
     description  = "Compare two linked Valorant players."
 )
 
-@app_commands.guilds(*TESTGUILD)
 async def compare(interaction: discord.Interaction, user1: discord.User, user2: discord.User):
     await interaction.response.defer(thinking=True)
 
