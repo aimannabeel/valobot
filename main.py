@@ -17,6 +17,7 @@ ssl_context = ssl.create_default_context(cafile=certifi.where())
 
 DATABASE_NAME = "valobot.db"
 
+
 def setup_db():
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
@@ -32,10 +33,12 @@ def setup_db():
     connection.commit()
     connection.close()
 
+
 def save_player_id(discord_user_id, name, tag, region):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO saved_players (discord_user_id, name, tag, region)
         VALUES(?,?,?,?)
 
@@ -43,10 +46,13 @@ def save_player_id(discord_user_id, name, tag, region):
             name = excluded.name,
             tag = excluded.tag,
             region = excluded.region
-""", (discord_user_id, name, tag, region))
+""",
+        (discord_user_id, name, tag, region),
+    )
 
     connection.commit()
     connection.close()
+
 
 def get_saved_player_id(discord_user_id):
     connection = sqlite3.connect(DATABASE_NAME)
@@ -54,7 +60,7 @@ def get_saved_player_id(discord_user_id):
 
     cursor.execute(
         """SELECT name, tag, region FROM saved_players WHERE discord_user_id = ?""",
-        (discord_user_id,)
+        (discord_user_id,),
     )
     saved_player = cursor.fetchone()
 
@@ -62,10 +68,11 @@ def get_saved_player_id(discord_user_id):
 
     return saved_player
 
+
 def delete_player_id(discord_user_id):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
-    
+
     cursor.execute(
         """DELETE FROM saved_players WHERE discord_user_id = ?""", (discord_user_id,)
     )
@@ -75,6 +82,7 @@ def delete_player_id(discord_user_id):
     connection.commit()
     connection.close()
     return delete_count
+
 
 MODE_LABELS = {
     "all": "All",
@@ -129,58 +137,58 @@ if token is None:
 if not HENRIK_API_KEY:
     raise ValueError("HENRIK_API_KEY is missing from .env")
 
-intents =  discord.Intents.default()
+intents = discord.Intents.default()
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
 
-    await bot.change_presence(
-        activity=discord.Game("/help")
-    )
+    await bot.change_presence(activity=discord.Game("/help"))
     synced_commands = await bot.tree.sync()
     print(f"Synced {len(synced_commands)} slash command(s).")
 
+
 def build_match_table(matches_payload, player_puuid):
     match_rows = []
-     
+
     for match in matches_payload["data"]:
         all_players = match["players"]
-     
+
         matching_player = None
-     
+
         for player in all_players:
             if player["puuid"] == player_puuid:
                 matching_player = player
                 break
         if matching_player is None:
             continue
-     
+
         player_team_id = matching_player["team_id"]
-     
+
         matching_team = None
-     
+
         for team in match["teams"]:
             if team["team_id"] == player_team_id:
                 matching_team = team
                 break
-     
+
         if matching_team is None:
             continue
-     
+
         match_win_status = "🟩 Victory" if matching_team["won"] else "🟥 Defeat"
-     
+
         map_name = match["metadata"]["map"]["name"]
         mode = match["metadata"]["queue"]["name"]
         agent_name = matching_player["agent"]["name"]
-     
+
         stats = matching_player["stats"]
         kills = stats["kills"]
         deaths = stats["deaths"]
         assists = stats["assists"]
-     
+
         row = f"**{match_win_status} • {map_name}**\n {agent_name} • {mode} • {kills}/{deaths}/{assists}"
 
         match_rows.append(row)
@@ -190,6 +198,7 @@ def build_match_table(matches_payload, player_puuid):
     else:
         return "No recent matches found."
 
+
 def calculate_recent_stats(matches_payload, player_puuid):
     total_kills = 0
     total_deaths = 0
@@ -198,13 +207,11 @@ def calculate_recent_stats(matches_payload, player_puuid):
     total_legshots = 0
     matches_counted = 0
 
-    
-
     for match in matches_payload["data"]:
         all_players = match["players"]
-             
+
         matching_player = None
-             
+
         for player in all_players:
             if player["puuid"] == player_puuid:
                 matching_player = player
@@ -224,17 +231,18 @@ def calculate_recent_stats(matches_payload, player_puuid):
     if matches_counted == 0:
         return "No recent stats found."
 
-    kd = total_kills/total_deaths if total_deaths > 0 else total_kills
+    kd = total_kills / total_deaths if total_deaths > 0 else total_kills
 
     total_shots = total_headshots + total_bodyshots + total_legshots
-    hs_percent = (total_headshots/total_shots) * 100 if total_shots > 0 else 0
+    hs_percent = (total_headshots / total_shots) * 100 if total_shots > 0 else 0
 
     return f"K/D: {kd:.2f} • HS: {hs_percent:.1f}%"
+
 
 def calculate_recent_match_stats(matches_payload, player_puuid):
     total_kills = 0
     total_deaths = 0
-    total_headshots = 0 
+    total_headshots = 0
     total_bodyshots = 0
     total_legshots = 0
     wins = 0
@@ -267,7 +275,7 @@ def calculate_recent_match_stats(matches_payload, player_puuid):
             continue
 
         if matching_team["won"]:
-            wins+=1
+            wins += 1
         else:
             losses += 1
 
@@ -286,7 +294,7 @@ def calculate_recent_match_stats(matches_payload, player_puuid):
             "wins": 0,
             "losses": 0,
             "matches_counted": 0,
-    }    
+        }
 
     kd = total_kills / total_deaths if total_deaths > 0 else total_kills
 
@@ -313,7 +321,6 @@ def calculate_recent_rr_change(mmr_history_payload):
         total_rr_change += game["last_change"]
 
     return total_rr_change
-    
 
 
 def build_match_url(region_value, safe_name, safe_tag, mode="all"):
@@ -323,6 +330,7 @@ def build_match_url(region_value, safe_name, safe_tag, mode="all"):
         return f"{base_url}?size=5"
 
     return f"{base_url}?size=5&mode={mode}"
+
 
 async def fetch_compare_data(name, tag, region_value):
     safe_name = quote(name, safe="")
@@ -336,7 +344,11 @@ async def fetch_compare_data(name, tag, region_value):
     timeout = aiohttp.ClientTimeout(total=10)
     connector = aiohttp.TCPConnector(ssl=ssl_context)
 
-    async with aiohttp.ClientSession(headers=headers, timeout=timeout, connector=connector,) as session:
+    async with aiohttp.ClientSession(
+        headers=headers,
+        timeout=timeout,
+        connector=connector,
+    ) as session:
         async with session.get(rank_url) as response:
             if response.status != 200:
                 return None
@@ -374,6 +386,7 @@ async def fetch_compare_data(name, tag, region_value):
         "matches_counted": recent_match_stats["matches_counted"],
     }
 
+
 def build_compare_verdict(player1, player2, user1, user2):
     player1_score = 0
     player2_score = 0
@@ -406,7 +419,9 @@ def build_compare_verdict(player1, player2, user1, user2):
         player2_score += 1
 
     if player1_score > player2_score:
-        return f"Someone check {user1.mention}'s aimlabs hours. get rekt {user2.mention}"
+        return (
+            f"Someone check {user1.mention}'s aimlabs hours. get rekt {user2.mention}"
+        )
 
     if player2_score > player1_score:
         return f"{user2.mention} ez win get clapped {user1.mention}. "
@@ -414,10 +429,10 @@ def build_compare_verdict(player1, player2, user1, user2):
     return "This one is too close to call. Run it back and settle it in ranked."
 
 
-    
-
 class ModeSelect(discord.ui.Select):
-    def __init__(self, player_name, player_tag, region_value, region_name, player_puuid, embed):
+    def __init__(
+        self, player_name, player_tag, region_value, region_name, player_puuid, embed
+    ):
 
         self.player_name = player_name
         self.player_tag = player_tag
@@ -433,22 +448,24 @@ class ModeSelect(discord.ui.Select):
             discord.SelectOption(label="Team Deathmatch", value="teamdeathmatch"),
             discord.SelectOption(label="Deathmatch", value="deathmatch"),
             discord.SelectOption(label="Swiftplay", value="swiftplay"),
-            ]
+        ]
 
         super().__init__(
             placeholder="Choose match mode",
-            min_values = 1,
-            max_values = 1,
-            options = options,
-            )
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
 
     async def callback(self, interaction: discord.Interaction):
         selected_mode = self.values[0]
 
-        safe_name = quote(self.player_name, safe ="")
-        safe_tag = quote(self.player_tag, safe ="")
+        safe_name = quote(self.player_name, safe="")
+        safe_tag = quote(self.player_tag, safe="")
 
-        matches_url = build_match_url(self.region_value, safe_name, safe_tag, selected_mode)
+        matches_url = build_match_url(
+            self.region_value, safe_name, safe_tag, selected_mode
+        )
 
         headers = {"Authorization": HENRIK_API_KEY}
         timeout = aiohttp.ClientTimeout(total=10)
@@ -457,7 +474,9 @@ class ModeSelect(discord.ui.Select):
         await interaction.response.defer()
 
         try:
-            async with aiohttp.ClientSession(headers=headers, timeout=timeout, connector=connector) as session:
+            async with aiohttp.ClientSession(
+                headers=headers, timeout=timeout, connector=connector
+            ) as session:
                 async with session.get(matches_url) as response:
                     if response.status != 200:
                         await interaction.followup.send(
@@ -466,38 +485,42 @@ class ModeSelect(discord.ui.Select):
                         )
                         return
                     matches_payload = await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError) :
+        except (aiohttp.ClientError, asyncio.TimeoutError):
             await interaction.followup.send(
-            "Could not reach the Valorant API. Please try again shortly.",
-            ephemeral=True,
-        )
+                "Could not reach the Valorant API. Please try again shortly.",
+                ephemeral=True,
+            )
             return
         mode_label = MODE_LABELS[selected_mode]
 
         self.embed.set_field_at(
-            index = 3,
+            index=3,
             name=f"{mode_label} Summary",
-            value= calculate_recent_stats(matches_payload, self.player_puuid),
-            inline = False
+            value=calculate_recent_stats(matches_payload, self.player_puuid),
+            inline=False,
         )
 
         self.embed.set_field_at(
-            index = 4,
+            index=4,
             name=f"Recent {mode_label} Matches",
             value=build_match_table(matches_payload, self.player_puuid),
             inline=False,
         )
 
-
         await interaction.message.edit(embed=self.embed, view=self.view)
-                
 
-        
 
 class ModeView(discord.ui.View):
-    def __init__(self, player_name, player_tag, region_value, region_name, player_puuid, embed):
+    def __init__(
+        self, player_name, player_tag, region_value, region_name, player_puuid, embed
+    ):
         super().__init__(timeout=120)
-        self.add_item(ModeSelect(player_name, player_tag, region_value, region_name, player_puuid, embed))
+        self.add_item(
+            ModeSelect(
+                player_name, player_tag, region_value, region_name, player_puuid, embed
+            )
+        )
+
 
 async def send_valstats(interaction, name, tag, region_value, region_name):
     await interaction.response.defer(thinking=True)
@@ -506,7 +529,9 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
     safe_tag = quote(tag, safe="")
 
     rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
-    account_url = f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
+    account_url = (
+        f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
+    )
     matches_url = build_match_url(region_value, safe_name, safe_tag)
     mmr_history_url = f"https://api.henrikdev.xyz/valorant/v2/mmr-history/{region_value}/pc/{safe_name}/{safe_tag}"
 
@@ -514,41 +539,56 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
     timeout = aiohttp.ClientTimeout(total=10)
     connector = aiohttp.TCPConnector(ssl=ssl_context)
     try:
-        async with aiohttp.ClientSession(headers=headers, timeout=timeout, connector=connector,) as session:
+        async with aiohttp.ClientSession(
+            headers=headers,
+            timeout=timeout,
+            connector=connector,
+        ) as session:
             async with session.get(rank_url) as response:
                 if response.status == 404:
-                    await interaction.followup.send("Could not find this player. Check the name, tag and region.")
+                    await interaction.followup.send(
+                        "Could not find this player. Check the name, tag and region."
+                    )
                     return
                 if response.status != 200:
-                    await interaction.followup.send(f"Valorant API returned error {response.status}. Try again shortly.")
+                    await interaction.followup.send(
+                        f"Valorant API returned error {response.status}. Try again shortly."
+                    )
                     return
                 rank_payload = await response.json()
             async with session.get(account_url) as response:
                 if response.status != 200:
-                    await interaction.followup.send(f"Found the player, but could not load their account level. Error {response.status}.")
+                    await interaction.followup.send(
+                        f"Found the player, but could not load their account level. Error {response.status}."
+                    )
                     return
                 account_payload = await response.json()
             async with session.get(matches_url) as response:
                 if response.status != 200:
-                    await interaction.followup.send(f"Found the player, but could not load their match history. Error {response.status}.")
+                    await interaction.followup.send(
+                        f"Found the player, but could not load their match history. Error {response.status}."
+                    )
                     return
                 matches_payload = await response.json()
             async with session.get(mmr_history_url) as response:
                 if response.status != 200:
-                    await interaction.followup.send(f"Found the player, but could not load their RR history. Error {response.status}.")
+                    await interaction.followup.send(
+                        f"Found the player, but could not load their RR history. Error {response.status}."
+                    )
                     return
                 mmr_history_payload = await response.json()
 
     except (aiohttp.ClientError, asyncio.TimeoutError) as error:
         print(f"HenrikDev request failed: {type(error).__name__}: {error!r}")
-        await interaction.followup.send("Could not reach the Valorant API. Please try again shortly")
+        await interaction.followup.send(
+            "Could not reach the Valorant API. Please try again shortly"
+        )
         return
 
-    
-    rank_data = rank_payload["data"]               #all rank data
-    account_data = account_payload["data"]         #all account data (level etc.)
+    rank_data = rank_payload["data"]  # all rank data
+    account_data = account_payload["data"]  # all account data (level etc.)
 
-    player_data = rank_data["account"]                        #self explanatory
+    player_data = rank_data["account"]  # self explanatory
     player_level = account_data["account_level"]
     player_puuid = player_data["puuid"]
     player_name = player_data["name"]
@@ -561,13 +601,14 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
 
     embed = discord.Embed(
         title=f"{player_name}#{player_tag}",
-        description= f"**Peak: {player_peak_rank}**",
-        color= discord.Color.red(), )
+        description=f"**Peak: {player_peak_rank}**",
+        color=discord.Color.red(),
+    )
     embed.add_field(
-                name = "Level",
-                value= f"{player_level}",
-                inline = True,
-            )
+        name="Level",
+        value=f"{player_level}",
+        inline=True,
+    )
     embed.add_field(
         name="Rank",
         value=f"{player_rank}",
@@ -579,100 +620,121 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
         inline=True,
     )
     embed.add_field(
-        name = "Recent Summary",
-        value= calculate_recent_stats(matches_payload, player_puuid),
-        inline = False,
-            )
+        name="Recent Summary",
+        value=calculate_recent_stats(matches_payload, player_puuid),
+        inline=False,
+    )
     embed.set_footer(text=f"{region_name} • PC")
 
     embed.add_field(
         name="All Recent Matches",
-        value=build_match_table(matches_payload=matches_payload, player_puuid=player_puuid),
+        value=build_match_table(
+            matches_payload=matches_payload, player_puuid=player_puuid
+        ),
         inline=False,
     )
-    await interaction.followup.send(embed=embed, view=ModeView(player_name, player_tag, region_value, region_name, player_puuid, embed))
+    await interaction.followup.send(
+        embed=embed,
+        view=ModeView(
+            player_name, player_tag, region_value, region_name, player_puuid, embed
+        ),
+    )
+
 
 @bot.tree.command(
     name="valstats",
     description="Show a Valorant player's recent stats.",
 )
-
 @app_commands.choices(
-    region= [app_commands.Choice(name="Asia Pacific", value="ap"),
-             app_commands.Choice(name="North America", value="na"),
-             app_commands.Choice(name="Europe", value="eu"),
-             app_commands.Choice(name="Korea", value="kr"),
-             app_commands.Choice(name="Latin America", value="latam"),
-             app_commands.Choice(name="Brazil", value="br"),
-        ]
+    region=[
+        app_commands.Choice(name="Asia Pacific", value="ap"),
+        app_commands.Choice(name="North America", value="na"),
+        app_commands.Choice(name="Europe", value="eu"),
+        app_commands.Choice(name="Korea", value="kr"),
+        app_commands.Choice(name="Latin America", value="latam"),
+        app_commands.Choice(name="Brazil", value="br"),
+    ]
 )
-
-async def valstat(interaction: discord.Interaction, name: str, tag: str, region: app_commands.Choice[str],):
+async def valstat(
+    interaction: discord.Interaction,
+    name: str,
+    tag: str,
+    region: app_commands.Choice[str],
+):
     await send_valstats(interaction, name, tag, region.value, region.name)
 
+
 @bot.tree.command(
-    name="setid",
-    description="Save your valorant ID for quick stat lookups."
+    name="setid", description="Save your valorant ID for quick stat lookups."
 )
 @app_commands.choices(
-    region= [app_commands.Choice(name="Asia Pacific", value="ap"),
-             app_commands.Choice(name="North America", value="na"),
-             app_commands.Choice(name="Europe", value="eu"),
-             app_commands.Choice(name="Korea", value="kr"),
-             app_commands.Choice(name="Latin America", value="latam"),
-             app_commands.Choice(name="Brazil", value="br"),
-        ]
+    region=[
+        app_commands.Choice(name="Asia Pacific", value="ap"),
+        app_commands.Choice(name="North America", value="na"),
+        app_commands.Choice(name="Europe", value="eu"),
+        app_commands.Choice(name="Korea", value="kr"),
+        app_commands.Choice(name="Latin America", value="latam"),
+        app_commands.Choice(name="Brazil", value="br"),
+    ]
 )
 async def setid(
     interaction: discord.Interaction,
-    name:str,
+    name: str,
     tag: str,
-    region: app_commands.Choice[str]
+    region: app_commands.Choice[str],
 ):
     discord_user_id = str(interaction.user.id)
 
     save_player_id(discord_user_id, name, tag, region.value)
 
-    await interaction.response.send_message(f"Set your Valorant ID **{name}#{tag}** in **{region.name}**.", ephemeral=True)
+    await interaction.response.send_message(
+        f"Set your Valorant ID **{name}#{tag}** in **{region.name}**.", ephemeral=True
+    )
 
-@bot.tree.command(
-    name="myid",
-    description="View your saved Valorant ID"
-)
 
+@bot.tree.command(name="myid", description="View your saved Valorant ID")
 async def myid(interaction: discord.Interaction):
     discord_user_id = str(interaction.user.id)
 
     saved_player = get_saved_player_id(discord_user_id)
 
     if saved_player == None:
-        await interaction.response.send_message("You do not have a saved Valorant ID yet. Use '/setid' first.", ephemeral=True)
+        await interaction.response.send_message(
+            "You do not have a saved Valorant ID yet. Use '/setid' first.",
+            ephemeral=True,
+        )
         return
 
     name, tag, region = saved_player
 
     region_label = REGION_LABELS[region]
 
-    await interaction.response.send_message(f"Your saved Valorant ID is **{name}#{tag}** in region **{region_label}**", ephemeral=True)
+    await interaction.response.send_message(
+        f"Your saved Valorant ID is **{name}#{tag}** in region **{region_label}**",
+        ephemeral=True,
+    )
 
-@bot.tree.command(
-    name="unsetid",
-    description="Remove your saved Valorant ID"
-)
+
+@bot.tree.command(name="unsetid", description="Remove your saved Valorant ID")
 async def unsetid(interaction: discord.Interaction):
     saved_player_id = str(interaction.user.id)
 
     deleted_count = delete_player_id(saved_player_id)
 
-    if deleted_count ==0:
-        await interaction.response.send_message("You do not have a saved Valorant ID to remove.", ephemeral = True,)
+    if deleted_count == 0:
+        await interaction.response.send_message(
+            "You do not have a saved Valorant ID to remove.",
+            ephemeral=True,
+        )
         return
 
-    await interaction.response.send_message("Removed you saved valorant ID.", ephemeral = True)
+    await interaction.response.send_message(
+        "Removed you saved valorant ID.", ephemeral=True
+    )
+
 
 @bot.tree.command(
-    name="valstatsme",
-    description="Show stats for your saved Valorant ID."
+    name="valstatsme", description="Show stats for your saved Valorant ID."
 )
 async def valstatsme(interaction: discord.Interaction):
     discord_user_id = str(interaction.user.id)
@@ -691,9 +753,10 @@ async def valstatsme(interaction: discord.Interaction):
 
     await send_valstats(interaction, name, tag, region, region_name)
 
+
 @bot.tree.command(
-    name = "valstatsuser",
-    description="Show stats for Discord user's if they have linked Valorant ID."
+    name="valstatsuser",
+    description="Show stats for Discord user's if they have linked Valorant ID.",
 )
 async def valstatuser(interaction: discord.Interaction, user: discord.User):
     discord_user_id = str(user.id)
@@ -702,8 +765,7 @@ async def valstatuser(interaction: discord.Interaction, user: discord.User):
 
     if saved_player is None:
         await interaction.response.send_message(
-            f"{user.mention} does not have a linked Valorant ID yet.",
-            ephemeral=True
+            f"{user.mention} does not have a linked Valorant ID yet.", ephemeral=True
         )
         return
 
@@ -712,11 +774,8 @@ async def valstatuser(interaction: discord.Interaction, user: discord.User):
 
     await send_valstats(interaction, name, tag, region, region_name)
 
-@bot.tree.command(
-    name = "help",
-    description="Show all Valobot commands."
-)
 
+@bot.tree.command(name="help", description="Show all Valobot commands.")
 async def help_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="Valobot Commands",
@@ -741,7 +800,7 @@ async def help_command(interaction: discord.Interaction):
         value="Look up a Valorant player using name, tag, and region.",
         inline=False,
     )
-    
+
     embed.add_field(
         name="/setid",
         value="Link your Discord account with your Valorant ID.",
@@ -761,19 +820,18 @@ async def help_command(interaction: discord.Interaction):
     )
 
     embed.add_field(
-    name="/compare",
-    value="Compare two linked Valorant players using recent competitive stats.",
-    inline=False,
-)
+        name="/compare",
+        value="Compare two linked Valorant players using recent competitive stats.",
+        inline=False,
+    )
 
     await interaction.response.send_message(embed=embed, ephemeral=False)
 
-@bot.tree.command(
-    name = "compare",
-    description  = "Compare two linked Valorant players."
-)
 
-async def compare(interaction: discord.Interaction, user1: discord.User, user2: discord.User):
+@bot.tree.command(name="compare", description="Compare two linked Valorant players.")
+async def compare(
+    interaction: discord.Interaction, user1: discord.User, user2: discord.User
+):
     await interaction.response.defer(thinking=True)
 
     saved_player1 = get_saved_player_id(str(user1.id))
@@ -813,22 +871,20 @@ async def compare(interaction: discord.Interaction, user1: discord.User, user2: 
     )
 
     embed.add_field(
-        name ="Rank",
-        value =f"{player1['rank']} vs {player2['rank']}",
-        inline = False
+        name="Rank", value=f"{player1['rank']} vs {player2['rank']}", inline=False
     )
 
     embed.add_field(
-        name = "Recent RR Change",
-        value = f"{player1['rr_change']:+} vs {player2['rr_change']:+}",
-        inline = False
+        name="Recent RR Change",
+        value=f"{player1['rr_change']:+} vs {player2['rr_change']:+}",
+        inline=False,
     )
 
     embed.add_field(
-            name ="Recent Record",
-            value =f"{player1['wins']}W-{player1['losses']}L vs {player2['wins']}W-{player2['losses']}L",
-            inline = False
-        )
+        name="Recent Record",
+        value=f"{player1['wins']}W-{player1['losses']}L vs {player2['wins']}W-{player2['losses']}L",
+        inline=False,
+    )
 
     embed.add_field(
         name="Recent K/D",
@@ -849,8 +905,6 @@ async def compare(interaction: discord.Interaction, user1: discord.User, user2: 
     )
 
     await interaction.followup.send(embed=embed)
-
-    
 
 
 setup_db()
