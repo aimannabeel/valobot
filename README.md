@@ -63,6 +63,17 @@ The match history dropdown currently supports:
 - Git
 - GitHub
 
+## Project Structure
+
+```text
+main.py          # Discord bot setup and slash commands
+config.py        # Environment variable and SSL setup
+constants.py     # Region labels, mode labels, and rank values
+database.py      # SQLite saved-player storage helpers
+stats.py         # Match/stat calculations and formatting helpers
+valorant_api.py  # HenrikDev API URL and data-fetching helpers
+views.py         # Discord dropdown UI classes
+
 ## Setup
 
 Clone the repository:
@@ -176,3 +187,8 @@ Currently, Valobot is tested in private Discord servers while features are still
 This project is currently in active development.
 
 The `.env` file is intentionally ignored by Git so private tokens and API keys are not uploaded to GitHub.
+
+```text
+This is no longer one giant script.
+The code is organized by responsibility.
+```
