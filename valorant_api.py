@@ -67,3 +67,89 @@ async def fetch_compare_data(name, tag, region_value):
         "losses": recent_match_stats["losses"],
         "matches_counted": recent_match_stats["matches_counted"],
     }
+
+
+async def send_valstats_data(name, tag, region_value):
+    safe_name = quote(name, safe="")
+    safe_tag = quote(tag, safe="")
+
+    rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
+    account_url = (
+        f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
+    )
+    matches_url = build_match_url(region_value, safe_name, safe_tag)
+    mmr_history_url = f"https://api.henrikdev.xyz/valorant/v2/mmr-history/{region_value}/pc/{safe_name}/{safe_tag}"
+
+    headers = {"Authorization": HENRIK_API_KEY}
+    timeout = aiohttp.ClientTimeout(total=10)
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+    async with aiohttp.ClientSession(
+        headers=headers,
+        timeout=timeout,
+        connector=connector,
+    ) as session:
+        async with session.get(rank_url) as response:
+            if response.status == 404:
+                return {
+                    "ok": False,
+                    "message": "Could not find this player. Check the name, tag and region.",
+                }
+            if response.status != 200:
+                return {
+                    "ok": False,
+                    "message": f"Valorant API returned error {response.status}. Try again shortly.",
+                }
+            rank_payload = await response.json()
+        async with session.get(account_url) as response:
+            if response.status != 200:
+                return {
+                    "ok": False,
+                    "message": f"Found the player, but could not load their account level. Error {response.status}.",
+                }
+
+            account_payload = await response.json()
+
+        async with session.get(matches_url) as response:
+            if response.status != 200:
+                return {
+                    "ok": False,
+                    "message": f"Found the player, but could not load their match history. Error {response.status}.",
+                }
+
+            matches_payload = await response.json()
+
+        async with session.get(mmr_history_url) as response:
+            if response.status != 200:
+                return {
+                    "ok": False,
+                    "message": f"Found the player, but could not load their RR history. Error {response.status}.",
+                }
+            mmr_history_payload = await response.json()
+
+    rank_data = rank_payload["data"]  # all rank data
+    account_data = account_payload["data"]  # all account data (level etc.)
+
+    player_data = rank_data["account"]  # self explanatory
+    player_level = account_data["account_level"]
+    player_puuid = player_data["puuid"]
+    player_name = player_data["name"]
+    player_tag = player_data["tag"]
+    player_rank_info = rank_data["current"]
+    player_rank = player_rank_info["tier"]["name"]
+    player_peak_rank = rank_data["peak"]["tier"]["name"]
+    player_rr = player_rank_info["rr"]
+    recent_rr_change = calculate_recent_rr_change(mmr_history_payload)
+
+    return {
+        "ok": True,
+        "player_name": player_name,
+        "player_tag": player_tag,
+        "player_puuid": player_puuid,
+        "player_level": player_level,
+        "player_rank": player_rank,
+        "player_peak_rank": player_peak_rank,
+        "player_rr": player_rr,
+        "recent_rr_change": recent_rr_change,
+        "matches_payload": matches_payload,
+    }

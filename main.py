@@ -12,7 +12,7 @@ from stats import (
     calculate_recent_rr_change,
 )
 from config import DISCORD_TOKEN, HENRIK_API_KEY, ssl_context
-from valorant_api import build_match_url, fetch_compare_data
+from valorant_api import build_match_url, fetch_compare_data, send_valstats_data
 from views import ModeView
 from discord import app_commands
 from discord.ext import commands
@@ -34,59 +34,8 @@ async def on_ready():
 async def send_valstats(interaction, name, tag, region_value, region_name):
     await interaction.response.defer(thinking=True)
 
-    safe_name = quote(name, safe="")
-    safe_tag = quote(tag, safe="")
-
-    rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
-    account_url = (
-        f"https://api.henrikdev.xyz/valorant/v1/account/{safe_name}/{safe_tag}"
-    )
-    matches_url = build_match_url(region_value, safe_name, safe_tag)
-    mmr_history_url = f"https://api.henrikdev.xyz/valorant/v2/mmr-history/{region_value}/pc/{safe_name}/{safe_tag}"
-
-    headers = {"Authorization": HENRIK_API_KEY}
-    timeout = aiohttp.ClientTimeout(total=10)
-    connector = aiohttp.TCPConnector(ssl=ssl_context)
     try:
-        async with aiohttp.ClientSession(
-            headers=headers,
-            timeout=timeout,
-            connector=connector,
-        ) as session:
-            async with session.get(rank_url) as response:
-                if response.status == 404:
-                    await interaction.followup.send(
-                        "Could not find this player. Check the name, tag and region."
-                    )
-                    return
-                if response.status != 200:
-                    await interaction.followup.send(
-                        f"Valorant API returned error {response.status}. Try again shortly."
-                    )
-                    return
-                rank_payload = await response.json()
-            async with session.get(account_url) as response:
-                if response.status != 200:
-                    await interaction.followup.send(
-                        f"Found the player, but could not load their account level. Error {response.status}."
-                    )
-                    return
-                account_payload = await response.json()
-            async with session.get(matches_url) as response:
-                if response.status != 200:
-                    await interaction.followup.send(
-                        f"Found the player, but could not load their match history. Error {response.status}."
-                    )
-                    return
-                matches_payload = await response.json()
-            async with session.get(mmr_history_url) as response:
-                if response.status != 200:
-                    await interaction.followup.send(
-                        f"Found the player, but could not load their RR history. Error {response.status}."
-                    )
-                    return
-                mmr_history_payload = await response.json()
-
+        valstats_data = await send_valstats_data(name, tag, region_value)
     except (aiohttp.ClientError, asyncio.TimeoutError) as error:
         print(f"HenrikDev request failed: {type(error).__name__}: {error!r}")
         await interaction.followup.send(
@@ -94,19 +43,19 @@ async def send_valstats(interaction, name, tag, region_value, region_name):
         )
         return
 
-    rank_data = rank_payload["data"]  # all rank data
-    account_data = account_payload["data"]  # all account data (level etc.)
+    if not valstats_data["ok"]:
+        await interaction.followup.send(valstats_data["message"])
+        return
 
-    player_data = rank_data["account"]  # self explanatory
-    player_level = account_data["account_level"]
-    player_puuid = player_data["puuid"]
-    player_name = player_data["name"]
-    player_tag = player_data["tag"]
-    player_rank_info = rank_data["current"]
-    player_rank = player_rank_info["tier"]["name"]
-    player_peak_rank = rank_data["peak"]["tier"]["name"]
-    player_rr = player_rank_info["rr"]
-    recent_rr_change = calculate_recent_rr_change(mmr_history_payload)
+    player_name = valstats_data["player_name"]
+    player_tag = valstats_data["player_tag"]
+    player_level = valstats_data["player_level"]
+    player_puuid = valstats_data["player_puuid"]
+    player_rank = valstats_data["player_rank"]
+    player_peak_rank = valstats_data["player_peak_rank"]
+    player_rr = valstats_data["player_rr"]
+    recent_rr_change = valstats_data["recent_rr_change"]
+    matches_payload = valstats_data["matches_payload"]
 
     embed = discord.Embed(
         title=f"{player_name}#{player_tag}",
