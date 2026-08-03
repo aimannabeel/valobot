@@ -58,6 +58,8 @@ The match history dropdown currently supports:
 - python-dotenv
 - SQLite
 - HenrikDev Valorant API
+- Oracle Cloud VPS
+- systemd
 - Git
 - GitHub
 
@@ -93,7 +95,6 @@ Create a `.env` file in the project folder:
 ```env
 DISCORD_TOKEN=your_discord_bot_token
 HENRIK_API_KEY=your_henrik_api_key
-GUILD_ID=your_test_server_id, your_friend_server_id (or more)
 ```
 
 The bot also creates a local SQLite database file:
@@ -106,8 +107,14 @@ This file stores saved Valorant IDs and is ignored by Git.
 Run the bot:
 
 ```powershell
+
 python main.py
 ```
+## Deployment
+
+The production bot is deployed on an Oracle Cloud VPS and runs as a `systemd` service.
+
+Currently, Valobot is tested in private Discord servers while features are still being developed.
 
 ## Environment Variables
 
@@ -115,7 +122,6 @@ python main.py
 | --- | --- |
 | `DISCORD_TOKEN` | Your Discord bot token |
 | `HENRIK_API_KEY` | Your HenrikDev Valorant API key |
-| `GUILD_ID` | Discord server ID used for slash command testing |
 
 ## Project Roadmap
 
@@ -149,7 +155,7 @@ python main.py
 - [x] Show how much RR gained or lost in the last 5 games
 - [x] Add `/help` command
 - [x] Add `/compare` command for comparing two players
-- [ ] Deploy the bot publicly (Oracle Cloud VPS)
+- [x] Deploy the bot on Oracle Cloud VPS
 
 ### Phase 2: Add-On Features
 
@@ -164,7 +170,6 @@ python main.py
 
 - [ ] Add custom image stat cards
 - [ ] Add rank, agent, and map icons
-- [ ] Deploy the bot so it can run 24/7
 
 ## Notes
 
