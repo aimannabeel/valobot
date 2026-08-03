@@ -1,5 +1,6 @@
 from constants import RANK_VALUES
 
+
 def build_match_table(matches_payload, player_puuid):
     match_rows = []
 
@@ -87,6 +88,7 @@ def calculate_recent_stats(matches_payload, player_puuid):
 
     return f"K/D: {kd:.2f} • HS: {hs_percent:.1f}%"
 
+
 def calculate_recent_match_stats(matches_payload, player_puuid):
     total_kills = 0
     total_deaths = 0
@@ -157,6 +159,7 @@ def calculate_recent_match_stats(matches_payload, player_puuid):
         "matches_counted": matches_counted,
     }
 
+
 def calculate_recent_rr_change(mmr_history_payload):
     history = mmr_history_payload["data"]["history"]
 
@@ -168,6 +171,7 @@ def calculate_recent_rr_change(mmr_history_payload):
         total_rr_change += game["last_change"]
 
     return total_rr_change
+
 
 def build_compare_verdict(player1, player2, user1, user2):
     player1_score = 0

@@ -1,27 +1,21 @@
-import os
 import aiohttp
 import asyncio
 from urllib.parse import quote
 import discord
 from database import setup_db, save_player_id, get_saved_player_id, delete_player_id
 from constants import MODE_LABELS, REGION_LABELS, RANK_VALUES
-from stats import build_match_table, build_compare_verdict, calculate_recent_stats, calculate_recent_match_stats, calculate_recent_rr_change
-import ssl
-import certifi
+from stats import (
+    build_match_table,
+    build_compare_verdict,
+    calculate_recent_stats,
+    calculate_recent_match_stats,
+    calculate_recent_rr_change,
+)
+from config import DISCORD_TOKEN, HENRIK_API_KEY, ssl_context
+from valorant_api import build_match_url, fetch_compare_data
+from views import ModeView
 from discord import app_commands
 from discord.ext import commands
-from dotenv import load_dotenv
-
-load_dotenv()
-token = os.getenv("DISCORD_TOKEN")
-HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
-ssl_context = ssl.create_default_context(cafile=certifi.where())
-
-if token is None:
-    raise ValueError("DISCORD_TOKEN is missing from .env")
-
-if not HENRIK_API_KEY:
-    raise ValueError("HENRIK_API_KEY is missing from .env")
 
 intents = discord.Intents.default()
 
@@ -35,161 +29,6 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game("/help"))
     synced_commands = await bot.tree.sync()
     print(f"Synced {len(synced_commands)} slash command(s).")
-
-def build_match_url(region_value, safe_name, safe_tag, mode="all"):
-    base_url = f"https://api.henrikdev.xyz/valorant/v4/matches/{region_value}/pc/{safe_name}/{safe_tag}"
-
-    if mode == "all":
-        return f"{base_url}?size=5"
-
-    return f"{base_url}?size=5&mode={mode}"
-
-
-async def fetch_compare_data(name, tag, region_value):
-    safe_name = quote(name, safe="")
-    safe_tag = quote(tag, safe="")
-
-    rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
-    matches_url = build_match_url(region_value, safe_name, safe_tag, "competitive")
-    mmr_history_url = f"https://api.henrikdev.xyz/valorant/v2/mmr-history/{region_value}/pc/{safe_name}/{safe_tag}"
-
-    headers = {"Authorization": HENRIK_API_KEY}
-    timeout = aiohttp.ClientTimeout(total=10)
-    connector = aiohttp.TCPConnector(ssl=ssl_context)
-
-    async with aiohttp.ClientSession(
-        headers=headers,
-        timeout=timeout,
-        connector=connector,
-    ) as session:
-        async with session.get(rank_url) as response:
-            if response.status != 200:
-                return None
-            rank_payload = await response.json()
-        async with session.get(matches_url) as response:
-            if response.status != 200:
-                return None
-            matches_payload = await response.json()
-        async with session.get(mmr_history_url) as response:
-            if response.status != 200:
-                return None
-            mmr_history_payload = await response.json()
-
-    rank_data = rank_payload["data"]
-    player_data = rank_data["account"]
-    player_puuid = player_data["puuid"]
-
-    player_rank_info = rank_data["current"]
-    player_rank = player_rank_info["tier"]["name"]
-    player_rr = player_rank_info["rr"]
-
-    recent_match_stats = calculate_recent_match_stats(matches_payload, player_puuid)
-    recent_rr_change = calculate_recent_rr_change(mmr_history_payload)
-
-    return {
-        "name": player_data["name"],
-        "tag": player_data["tag"],
-        "rank": player_rank,
-        "rr": player_rr,
-        "rr_change": recent_rr_change,
-        "kd": recent_match_stats["kd"],
-        "hs_percent": recent_match_stats["hs_percent"],
-        "wins": recent_match_stats["wins"],
-        "losses": recent_match_stats["losses"],
-        "matches_counted": recent_match_stats["matches_counted"],
-    }
-
-class ModeSelect(discord.ui.Select):
-    def __init__(
-        self, player_name, player_tag, region_value, region_name, player_puuid, embed
-    ):
-
-        self.player_name = player_name
-        self.player_tag = player_tag
-        self.region_value = region_value
-        self.region_name = region_name
-        self.player_puuid = player_puuid
-        self.embed = embed
-        options = [
-            discord.SelectOption(label="All", value="all"),
-            discord.SelectOption(label="Competitive", value="competitive"),
-            discord.SelectOption(label="Unrated", value="unrated"),
-            discord.SelectOption(label="Spike Rush", value="spikerush"),
-            discord.SelectOption(label="Team Deathmatch", value="teamdeathmatch"),
-            discord.SelectOption(label="Deathmatch", value="deathmatch"),
-            discord.SelectOption(label="Swiftplay", value="swiftplay"),
-        ]
-
-        super().__init__(
-            placeholder="Choose match mode",
-            min_values=1,
-            max_values=1,
-            options=options,
-        )
-
-    async def callback(self, interaction: discord.Interaction):
-        selected_mode = self.values[0]
-
-        safe_name = quote(self.player_name, safe="")
-        safe_tag = quote(self.player_tag, safe="")
-
-        matches_url = build_match_url(
-            self.region_value, safe_name, safe_tag, selected_mode
-        )
-
-        headers = {"Authorization": HENRIK_API_KEY}
-        timeout = aiohttp.ClientTimeout(total=10)
-        connector = aiohttp.TCPConnector(ssl=ssl_context)
-
-        await interaction.response.defer()
-
-        try:
-            async with aiohttp.ClientSession(
-                headers=headers, timeout=timeout, connector=connector
-            ) as session:
-                async with session.get(matches_url) as response:
-                    if response.status != 200:
-                        await interaction.followup.send(
-                            f"Could not load {selected_mode} matches. Error {response.status}.",
-                            ephemeral=True,
-                        )
-                        return
-                    matches_payload = await response.json()
-        except (aiohttp.ClientError, asyncio.TimeoutError):
-            await interaction.followup.send(
-                "Could not reach the Valorant API. Please try again shortly.",
-                ephemeral=True,
-            )
-            return
-        mode_label = MODE_LABELS[selected_mode]
-
-        self.embed.set_field_at(
-            index=3,
-            name=f"{mode_label} Summary",
-            value=calculate_recent_stats(matches_payload, self.player_puuid),
-            inline=False,
-        )
-
-        self.embed.set_field_at(
-            index=4,
-            name=f"Recent {mode_label} Matches",
-            value=build_match_table(matches_payload, self.player_puuid),
-            inline=False,
-        )
-
-        await interaction.message.edit(embed=self.embed, view=self.view)
-
-
-class ModeView(discord.ui.View):
-    def __init__(
-        self, player_name, player_tag, region_value, region_name, player_puuid, embed
-    ):
-        super().__init__(timeout=120)
-        self.add_item(
-            ModeSelect(
-                player_name, player_tag, region_value, region_name, player_puuid, embed
-            )
-        )
 
 
 async def send_valstats(interaction, name, tag, region_value, region_name):
@@ -578,4 +417,4 @@ async def compare(
 
 
 setup_db()
-bot.run(token=token)
+bot.run(token=DISCORD_TOKEN)
