@@ -3,7 +3,8 @@ import aiohttp
 import asyncio
 from urllib.parse import quote
 import discord
-import sqlite3
+from database import setup_db, save_player_id, get_saved_player_id, delete_player_id
+from constants import MODE_LABELS, REGION_LABELS, RANK_VALUES
 import ssl
 import certifi
 from discord import app_commands
@@ -14,122 +15,6 @@ load_dotenv()
 token = os.getenv("DISCORD_TOKEN")
 HENRIK_API_KEY = os.getenv("HENRIK_API_KEY")
 ssl_context = ssl.create_default_context(cafile=certifi.where())
-
-DATABASE_NAME = "valobot.db"
-
-
-def setup_db():
-    connection = sqlite3.connect(DATABASE_NAME)
-    cursor = connection.cursor()
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS saved_players(
-        discord_user_id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        tag TEXT NOT NULL,
-        region TEXT NOT NULL
-    )
-""")
-
-    connection.commit()
-    connection.close()
-
-
-def save_player_id(discord_user_id, name, tag, region):
-    connection = sqlite3.connect(DATABASE_NAME)
-    cursor = connection.cursor()
-    cursor.execute(
-        """
-        INSERT INTO saved_players (discord_user_id, name, tag, region)
-        VALUES(?,?,?,?)
-
-        ON CONFLICT(discord_user_id) DO UPDATE SET
-            name = excluded.name,
-            tag = excluded.tag,
-            region = excluded.region
-""",
-        (discord_user_id, name, tag, region),
-    )
-
-    connection.commit()
-    connection.close()
-
-
-def get_saved_player_id(discord_user_id):
-    connection = sqlite3.connect(DATABASE_NAME)
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """SELECT name, tag, region FROM saved_players WHERE discord_user_id = ?""",
-        (discord_user_id,),
-    )
-    saved_player = cursor.fetchone()
-
-    connection.close()
-
-    return saved_player
-
-
-def delete_player_id(discord_user_id):
-    connection = sqlite3.connect(DATABASE_NAME)
-    cursor = connection.cursor()
-
-    cursor.execute(
-        """DELETE FROM saved_players WHERE discord_user_id = ?""", (discord_user_id,)
-    )
-
-    delete_count = cursor.rowcount
-
-    connection.commit()
-    connection.close()
-    return delete_count
-
-
-MODE_LABELS = {
-    "all": "All",
-    "competitive": "Competitive",
-    "unrated": "Unrated",
-    "spikerush": "Spike Rush",
-    "teamdeathmatch": "Team Deathmatch",
-    "deathmatch": "Deathmatch",
-    "swiftplay": "Swiftplay",
-}
-
-REGION_LABELS = {
-    "ap": "Asia Pacific",
-    "na": "North America",
-    "eu": "Europe",
-    "kr": "Korea",
-    "latam": "Latin America",
-    "br": "Brazil",
-}
-RANK_VALUES = {
-    "Unranked": 0,
-    "Iron 1": 1,
-    "Iron 2": 2,
-    "Iron 3": 3,
-    "Bronze 1": 4,
-    "Bronze 2": 5,
-    "Bronze 3": 6,
-    "Silver 1": 7,
-    "Silver 2": 8,
-    "Silver 3": 9,
-    "Gold 1": 10,
-    "Gold 2": 11,
-    "Gold 3": 12,
-    "Platinum 1": 13,
-    "Platinum 2": 14,
-    "Platinum 3": 15,
-    "Diamond 1": 16,
-    "Diamond 2": 17,
-    "Diamond 3": 18,
-    "Ascendant 1": 19,
-    "Ascendant 2": 20,
-    "Ascendant 3": 21,
-    "Immortal 1": 22,
-    "Immortal 2": 23,
-    "Immortal 3": 24,
-    "Radiant": 25,
-}
 
 if token is None:
     raise ValueError("DISCORD_TOKEN is missing from .env")
