@@ -172,6 +172,7 @@ Currently, Valobot is tested in private Discord servers while features are still
 
 - [ ] Add server leaderboard
 - [ ] Add daily shop lookup
+- [ ] Add `/lfgcustom` command to create a custom Valorant lobby
 
 ### Phase 3: AI Features
 

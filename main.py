@@ -12,7 +12,12 @@ from stats import (
     calculate_recent_rr_change,
 )
 from config import DISCORD_TOKEN, HENRIK_API_KEY, ssl_context
-from valorant_api import build_match_url, fetch_compare_data, send_valstats_data
+from valorant_api import (
+    build_match_url,
+    fetch_compare_data,
+    send_valstats_data,
+    fetch_player_puuid,
+)
 from views import ModeView
 from discord import app_commands
 from discord.ext import commands
@@ -142,8 +147,16 @@ async def setid(
     region: app_commands.Choice[str],
 ):
     discord_user_id = str(interaction.user.id)
+    puuid = await fetch_player_puuid(name, tag, region.value)
 
-    save_player_id(discord_user_id, name, tag, region.value)
+    if puuid is None:
+        await interaction.response.send_message(
+            "Could not find this player. Check the name, tag, and region.",
+            ephemeral=True,
+        )
+        return
+
+    save_player_id(discord_user_id, name, tag, region.value, puuid)
 
     await interaction.response.send_message(
         f"Set your Valorant ID **{name}#{tag}** in **{region.name}**.", ephemeral=True
@@ -163,7 +176,7 @@ async def myid(interaction: discord.Interaction):
         )
         return
 
-    name, tag, region = saved_player
+    name, tag, region, puuid = saved_player
 
     region_label = REGION_LABELS[region]
 
@@ -206,7 +219,7 @@ async def valstatsme(interaction: discord.Interaction):
         )
         return
 
-    name, tag, region = saved_player
+    name, tag, region, puuid = saved_player
     region_name = REGION_LABELS[region]
 
     await send_valstats(interaction, name, tag, region, region_name)
@@ -227,7 +240,7 @@ async def valstatuser(interaction: discord.Interaction, user: discord.User):
         )
         return
 
-    name, tag, region = saved_player
+    name, tag, region, puuid = saved_player
     region_name = REGION_LABELS[region]
 
     await send_valstats(interaction, name, tag, region, region_name)
@@ -309,8 +322,8 @@ async def compare(
         )
         return
 
-    name1, tag1, region1 = saved_player1
-    name2, tag2, region2 = saved_player2
+    name1, tag1, region1, puuid1 = saved_player1
+    name2, tag2, region2, puuid2 = saved_player2
 
     player1 = await fetch_compare_data(name1, tag1, region1)
     player2 = await fetch_compare_data(name2, tag2, region2)

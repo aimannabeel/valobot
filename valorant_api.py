@@ -3,15 +3,40 @@ from urllib.parse import quote
 
 from config import HENRIK_API_KEY, ssl_context
 from stats import calculate_recent_match_stats, calculate_recent_rr_change
+from leaderboard import is_match_in_week
 
 
-def build_match_url(region_value, safe_name, safe_tag, mode="all"):
+def build_match_url(region_value, safe_name, safe_tag, mode="all", size=5, start=0):
     base_url = f"https://api.henrikdev.xyz/valorant/v4/matches/{region_value}/pc/{safe_name}/{safe_tag}"
 
     if mode == "all":
-        return f"{base_url}?size=5"
+        return f"{base_url}?size={size}&start={start}"
 
-    return f"{base_url}?size=5&mode={mode}"
+    return f"{base_url}?size={size}&start={start}&mode={mode}"
+
+
+async def fetch_player_puuid(name, tag, region_value):
+    safe_name = quote(name, safe="")
+    safe_tag = quote(tag, safe="")
+
+    rank_url = f"https://api.henrikdev.xyz/valorant/v3/mmr/{region_value}/pc/{safe_name}/{safe_tag}"
+
+    headers = {"Authorization": HENRIK_API_KEY}
+    timeout = aiohttp.ClientTimeout(total=10)
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+    async with aiohttp.ClientSession(
+        headers=headers,
+        timeout=timeout,
+        connector=connector,
+    ) as session:
+        async with session.get(rank_url) as response:
+            if response.status != 200:
+                return None
+
+            rank_payload = await response.json()
+
+    return rank_payload["data"]["account"]["puuid"]
 
 
 async def fetch_compare_data(name, tag, region_value):
@@ -153,3 +178,53 @@ async def send_valstats_data(name, tag, region_value):
         "recent_rr_change": recent_rr_change,
         "matches_payload": matches_payload,
     }
+
+
+async def fetch_weekly_competitive_matches(name, tag, region_value, week_start):
+    safe_name = quote(name, safe="")
+    safe_tag = quote(tag, safe="")
+
+    headers = {"Authorization": HENRIK_API_KEY}
+    timeout = aiohttp.ClientTimeout(total=10)
+    connector = aiohttp.TCPConnector(ssl=ssl_context)
+
+    weekly_matches = []
+    start = 0
+    size = 10
+    keep_fetching = True
+
+    async with aiohttp.ClientSession(
+        headers=headers,
+        timeout=timeout,
+        connector=connector,
+    ) as session:
+        while keep_fetching:
+            matches_url = build_match_url(
+                region_value, safe_name, safe_tag, "competitive", size, start
+            )
+            async with session.get(matches_url) as response:
+                if response.status != 200:
+                    return None
+
+                matches_payload = await response.json()
+
+            matches = matches_payload["data"]
+
+            if not matches:
+                break
+
+            for match in matches:
+                if not match["metadata"]["is_completed"]:
+                    continue
+
+                started_at = match["metadata"]["started_at"]
+
+                if is_match_in_week(started_at, week_start):
+                    weekly_matches.append(match)
+                else:
+                    keep_fetching = False
+                    break
+
+            start += size
+
+    return weekly_matches
