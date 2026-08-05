@@ -38,6 +38,12 @@ def setup_db():
     if "puuid" not in saved_player_columns:
         cursor.execute("ALTER TABLE saved_players ADD COLUMN puuid TEXT")
 
+    cursor.execute("""CREATE UNIQUE INDEX IF NOT EXISTS unique_saved_players_puuid
+                      ON saved_players(puuid)
+                      WHERE puuid IS NOT NULL
+    """
+)
+
     connection.commit()
     connection.close()
 
@@ -193,3 +199,19 @@ def update_saved_player_puuid(discord_user_id, puuid):
 
     connection.commit()
     connection.close()
+
+
+def get_discord_user_by_puuid(puuid):
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute(
+        """SELECT discord_user_id FROM saved_players WHERE puuid = ?""",
+        (puuid,),
+    )
+
+    saved_user = cursor.fetchone()
+
+    connection.close()
+
+    return saved_user

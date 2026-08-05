@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 from urllib.parse import quote
 import discord
-from database import (setup_db, save_player_id, get_saved_player_id, delete_player_id, get_weekly_leaderboard)
+from database import (setup_db, save_player_id, get_saved_player_id, delete_player_id, get_weekly_leaderboard, get_discord_user_by_puuid)
 from constants import MODE_LABELS, REGION_LABELS, RANK_VALUES
 from leaderboard import refresh_weekly_leaderboard
 from stats import (
@@ -155,6 +155,15 @@ async def setid(
             "Could not find this player. Check the name, tag, and region.",
             ephemeral=True,
         )
+        return
+
+    linked_user = get_discord_user_by_puuid(puuid)
+
+    if linked_user is not None and linked_user[0] != discord_user_id:
+        await interaction.response.send_message(
+        "This Valorant account is already linked to another Discord user.",
+        ephemeral=True,
+    )
         return
 
     save_player_id(discord_user_id, name, tag, region.value, puuid)
