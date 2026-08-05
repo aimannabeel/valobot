@@ -2,14 +2,14 @@ from constants import RANK_VALUES
 
 def find_matching_player(match, player_puuid):
     for player in match["players"]:
-                if player["puuid"] == player_puuid:
-                    return player
+            if player["puuid"] == player_puuid:
+                return player
     return None
 
 def find_matching_team(match, team_id):
     for team in match["teams"]:
-                if team["team_id"] == team_id:
-                    return team
+            if team["team_id"] == team_id:
+                return team
     return None
 
 def build_match_table(matches_payload, player_puuid):
@@ -81,14 +81,7 @@ def calculate_recent_stats(matches_payload, player_puuid):
     matches_counted = 0
 
     for match in matches_payload["data"]:
-        all_players = match["players"]
-
-        matching_player = None
-
-        for player in all_players:
-            if player["puuid"] == player_puuid:
-                matching_player = player
-                break
+        matching_player = find_matching_player(match, player_puuid)
         if matching_player is None:
             continue
 
@@ -123,26 +116,14 @@ def calculate_recent_match_stats(matches_payload, player_puuid):
     matches_counted = 0
 
     for match in matches_payload["data"]:
-        all_players = match["players"]
-
-        matching_player = None
-
-        for player in all_players:
-            if player["puuid"] == player_puuid:
-                matching_player = player
-                break
+        matching_player = find_matching_player(match, player_puuid)
 
         if matching_player is None:
             continue
 
         player_team_id = matching_player["team_id"]
 
-        matching_team = None
-
-        for team in match["teams"]:
-            if team["team_id"] == player_team_id:
-                matching_team = team
-                break
+        matching_team = find_matching_team(match, player_team_id)
 
         if matching_team is None:
             continue
