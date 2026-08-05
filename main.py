@@ -2,8 +2,9 @@ import aiohttp
 import asyncio
 from urllib.parse import quote
 import discord
-from database import setup_db, save_player_id, get_saved_player_id, delete_player_id
+from database import (setup_db, save_player_id, get_saved_player_id, delete_player_id, get_weekly_leaderboard)
 from constants import MODE_LABELS, REGION_LABELS, RANK_VALUES
+from leaderboard import refresh_weekly_leaderboard
 from stats import (
     build_match_table,
     build_compare_verdict,
@@ -375,6 +376,56 @@ async def compare(
         inline=False,
     )
 
+    await interaction.followup.send(embed=embed)
+
+@bot.tree.command(
+        name="leaderboard",
+        description="Show this week's server Valorant leaderboard."
+        )
+async def leaderboard(interaction: discord.Interaction):
+    await interaction.response.defer(thinking = True)
+
+    server_id= str(interaction.guild_id)
+
+    week_start = await refresh_weekly_leaderboard(server_id)
+
+    leaderboard_rows = get_weekly_leaderboard(server_id, week_start)
+
+    if not leaderboard_rows:
+        await interaction.followup.send(
+            "No leaderboard data yet. Players need to link their Valorant ID with `/setid` first."
+        )
+        return
+
+    leaderboard_lines = []
+
+    for position, row in enumerate(leaderboard_rows, start = 1):
+        discord_user_id, wins, matches_played = row
+
+        if position == 1:  
+            leaderboard_lines.append(
+                f"🏆 <@{discord_user_id}> — **{wins} wins**"
+            )
+        elif position == 2:
+          leaderboard_lines.append(
+                f"🥈 <@{discord_user_id}> — **{wins} wins**"
+            )
+        elif position == 3:
+           leaderboard_lines.append(
+                f"🥉 <@{discord_user_id}> — **{wins} wins**"
+            )
+        else:
+            leaderboard_lines.append(
+            f"**#{position}** <@{discord_user_id}> — **{wins} wins**"
+        )
+
+    embed = discord.Embed(
+        title="Weekly Valorant Leaderboard",
+        description="\n".join(leaderboard_lines),
+        color=discord.Color.gold(),
+    )
+
+    embed.set_footer(text=f"Week starting {week_start}. To participate use '/setid'")
     await interaction.followup.send(embed=embed)
 
 

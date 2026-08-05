@@ -3,7 +3,7 @@ from urllib.parse import quote
 
 from config import HENRIK_API_KEY, ssl_context
 from stats import calculate_recent_match_stats, calculate_recent_rr_change
-from leaderboard import is_match_in_week
+from time_utils import is_match_in_week
 
 
 def build_match_url(region_value, safe_name, safe_tag, mode="all", size=5, start=0):

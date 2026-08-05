@@ -217,3 +217,19 @@ def build_compare_verdict(player1, player2, user1, user2):
         return f"{user2.mention} ez win get clapped {user1.mention}. "
 
     return "This one is too close to call. Run it back and settle it in ranked."
+
+
+def did_player_win_match(match, player_puuid):
+    matching_player = find_matching_player(match, player_puuid)
+
+    if matching_player is None:
+        return None
+
+    player_team_id = matching_player["team_id"]
+    
+    matching_team = find_matching_team(match, player_team_id)
+
+    if matching_team is None:
+        return None
+
+    return matching_team["won"]

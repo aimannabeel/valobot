@@ -1,22 +1,25 @@
-from datetime import datetime, timedelta, timezone
+from time_utils import get_current_week_start
+from database import get_all_saved_players, record_counted_match
+from stats import did_player_win_match
+from valorant_api import fetch_weekly_competitive_matches
 
+async def refresh_weekly_leaderboard(server_id):
+    week_start = get_current_week_start()
+    saved_players = get_all_saved_players()
 
-def get_current_week_start():
-    now = datetime.now(timezone.utc)
+    for discord_user_id, name, tag, region, puuid in saved_players:
+        weekly_matches = await fetch_weekly_competitive_matches(name, tag, region, week_start)
 
-    days_since_sunday = (now.weekday() + 1) % 7
+        if weekly_matches is None:
+            continue
 
-    week_start = now - timedelta(days=days_since_sunday)
+        for match in weekly_matches:
+            match_id = match["metadata"]["match_id"]
+            played_at = match["metadata"]["started_at"]
+            won = did_player_win_match(match, puuid)
 
-    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+            if won is None: continue
 
-    return week_start.date().isoformat()
+            record_counted_match(match_id, server_id, discord_user_id, week_start, won, played_at)
 
-
-def is_match_in_week(started_at, week_start):
-    match_time = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
-
-    week_start_time = datetime.fromisoformat(week_start).replace(tzinfo=timezone.utc)
-    week_end_time = week_start_time + timedelta(days=7)
-
-    return week_start_time <= match_time < week_end_time
+        return week_start

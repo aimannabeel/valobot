@@ -104,6 +104,8 @@ def record_counted_match(
     connection.close()
 
 
+
+
 def get_weekly_leaderboard(server_id, week_start):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
