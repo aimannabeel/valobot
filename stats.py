@@ -1,35 +1,58 @@
 from constants import RANK_VALUES
 
+def find_matching_player(match, player_puuid):
+    for player in match["players"]:
+                if player["puuid"] == player_puuid:
+                    return player
+    return None
+
+def find_matching_team(match, team_id):
+    for team in match["teams"]:
+                if team["team_id"] == team_id:
+                    return team
+    return None
 
 def build_match_table(matches_payload, player_puuid):
     match_rows = []
 
     for match in matches_payload["data"]:
-        all_players = match["players"]
+        matching_player = find_matching_player(match, player_puuid)
 
-        matching_player = None
-
-        for player in all_players:
-            if player["puuid"] == player_puuid:
-                matching_player = player
-                break
         if matching_player is None:
             continue
 
         player_team_id = matching_player["team_id"]
 
-        matching_team = None
-
-        for team in match["teams"]:
-            if team["team_id"] == player_team_id:
-                matching_team = team
-                break
+        matching_team = find_matching_team(match, player_team_id)
 
         if matching_team is None:
             continue
 
-        match_win_status = "🟩 Victory" if matching_team["won"] else "🟥 Defeat"
+        mode = match["metadata"]["queue"]["name"]
 
+        if mode == "Deathmatch":
+            player_score = matching_player["stats"]["score"]
+
+            highest_score = 0
+
+            for player in match["players"]:
+                player_score_in_match = player["stats"]["score"]
+
+                if player_score_in_match > highest_score:
+                    highest_score = player_score_in_match
+
+            if player_score == highest_score:
+                match_win_status = "🟩 Victory"
+            else:
+                match_win_status = "🟥 Defeat"
+
+        elif matching_team["won"]:
+            match_win_status = "🟩 Victory"
+        elif match["teams"][0]["won"] == False and match["teams"][1]["won"] == False:
+            match_win_status = "🟧 Draw"
+        else:
+            match_win_status = "🟥 Defeat"
+     
         map_name = match["metadata"]["map"]["name"]
         mode = match["metadata"]["queue"]["name"]
         agent_name = matching_player["agent"]["name"]
