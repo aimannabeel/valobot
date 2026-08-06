@@ -396,7 +396,7 @@ async def leaderboard(interaction: discord.Interaction):
 
     server_id= str(interaction.guild_id)
 
-    week_start = await refresh_weekly_leaderboard(server_id)
+    week_start = await refresh_weekly_leaderboard(interaction.guild)
 
     leaderboard_rows = get_weekly_leaderboard(server_id, week_start)
 
