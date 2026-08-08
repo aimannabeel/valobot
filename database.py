@@ -16,20 +16,18 @@ def setup_db():
   """)
     cursor.execute("""CREATE TABLE IF NOT EXISTS tracked_matches(
                 match_id TEXT NOT NULL,
-                server_id TEXT NOT NULL,
                 discord_user_id TEXT NOT NULL,
                 week_start TEXT NOT NULL,
                 won INTEGER NOT NULL,
                 played_at TEXT NOT NULL,
-                PRIMARY KEY(match_id, discord_user_id, server_id)
+                PRIMARY KEY(match_id, discord_user_id)
         )""")
     cursor.execute("""CREATE TABLE IF NOT EXISTS weekly_scores(
-                    server_id TEXT NOT NULL,
                     discord_user_id TEXT NOT NULL,
                     week_start TEXT NOT NULL,
                     wins INTEGER NOT NULL DEFAULT 0,
                     matches_played INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY(discord_user_id, server_id, week_start)
+                    PRIMARY KEY(discord_user_id, week_start)
             )""")
 
     cursor.execute("PRAGMA table_info(saved_players)")
@@ -41,8 +39,7 @@ def setup_db():
     cursor.execute("""CREATE UNIQUE INDEX IF NOT EXISTS unique_saved_players_puuid
                       ON saved_players(puuid)
                       WHERE puuid IS NOT NULL
-    """
-)
+    """)
 
     connection.commit()
     connection.close()
@@ -63,7 +60,7 @@ def get_all_saved_players():
     return saved_players
 
 
-def has_match_been_counted(match_id, discord_user_id, server_id):
+def has_match_been_counted(match_id, discord_user_id):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
@@ -71,9 +68,8 @@ def has_match_been_counted(match_id, discord_user_id, server_id):
         """SELECT 1
                 FROM tracked_matches 
                 WHERE match_id = ? 
-                AND  discord_user_id = ? 
-                AND server_id = ?""",
-        (match_id, discord_user_id, server_id),
+                AND  discord_user_id = ?""",
+        (match_id, discord_user_id),
     )
 
     counted_match = cursor.fetchone()
@@ -81,38 +77,34 @@ def has_match_been_counted(match_id, discord_user_id, server_id):
     return counted_match is not None
 
 
-def record_counted_match(
-    match_id, server_id, discord_user_id, week_start, won, played_at
-):
+def record_counted_match(match_id, discord_user_id, week_start, won, played_at):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
     cursor.execute(
         """INSERT OR IGNORE INTO tracked_matches(
-        match_id, server_id, discord_user_id, week_start, won, played_at
-        ) VALUES(?, ?, ?, ?, ?, ?)""",
-        (match_id, server_id, discord_user_id, week_start, won, played_at),
+        match_id, discord_user_id, week_start, won, played_at
+        ) VALUES(?, ?, ?, ?, ?)""",
+        (match_id, discord_user_id, week_start, won, played_at),
     )
 
     if cursor.rowcount == 1:
         cursor.execute(
             """INSERT INTO weekly_scores(
-            server_id, discord_user_id, week_start, wins, matches_played)
-            VALUES (?, ?, ?, ?, 1)
-            ON CONFLICT(server_id, discord_user_id, week_start)
+            discord_user_id, week_start, wins, matches_played)
+            VALUES (?, ?, ?, 1)
+            ON CONFLICT(discord_user_id, week_start)
             DO UPDATE SET
             wins = wins + excluded.wins,
             matches_played = matches_played + 1""",
-            (server_id, discord_user_id, week_start, 1 if won else 0),
+            (discord_user_id, week_start, 1 if won else 0),
         )
 
     connection.commit()
     connection.close()
 
 
-
-
-def get_weekly_leaderboard(server_id, week_start):
+def get_weekly_leaderboard(week_start):
     connection = sqlite3.connect(DATABASE_NAME)
     cursor = connection.cursor()
 
@@ -120,11 +112,10 @@ def get_weekly_leaderboard(server_id, week_start):
         """
         SELECT discord_user_id, wins, matches_played
         FROM weekly_scores
-        WHERE server_id = ?
-        AND week_start = ?
+        WHERE week_start = ?
         ORDER BY wins DESC, matches_played ASC
         """,
-        (server_id, week_start),
+        (week_start,),
     )
 
     leaderboard_rows = cursor.fetchall()
@@ -183,6 +174,7 @@ def delete_player_id(discord_user_id):
     connection.commit()
     connection.close()
     return delete_count
+
 
 def update_saved_player_puuid(discord_user_id, puuid):
     connection = sqlite3.connect(DATABASE_NAME)

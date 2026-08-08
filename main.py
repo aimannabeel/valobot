@@ -2,9 +2,17 @@ import aiohttp
 import asyncio
 from urllib.parse import quote
 import discord
-from database import (setup_db, save_player_id, get_saved_player_id, delete_player_id, get_weekly_leaderboard, get_discord_user_by_puuid)
+from database import (
+    setup_db,
+    save_player_id,
+    get_saved_player_id,
+    delete_player_id,
+    get_weekly_leaderboard,
+    get_discord_user_by_puuid,
+)
 from constants import MODE_LABELS, REGION_LABELS, RANK_VALUES
-from leaderboard import refresh_weekly_leaderboard
+from datetime import datetime, timedelta, timezone
+from leaderboard import refresh_weekly_leaderboard, refresh_all_leaderboards
 from stats import (
     build_match_table,
     build_compare_verdict,
@@ -21,11 +29,41 @@ from valorant_api import (
 )
 from views import ModeView
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
+from time_utils import get_current_week_start
 
 intents = discord.Intents.default()
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+refresh_starter_started = False
+
+
+@tasks.loop(hours=1)
+async def refresh_leaderboards_task():
+    print("Refreshing leaderboard cache...")
+    await refresh_all_leaderboards()
+    print("Finished refreshing leaderboard cache.")
+
+
+async def start_refresh_task_on_next_hour():
+    now = datetime.now(timezone.utc)
+
+    next_hour = (now + timedelta(hours=1)).replace(
+        minute=0,
+        second=0,
+        microsecond=0,
+    )
+
+    seconds_until_next_hour = (next_hour - now).total_seconds()
+    print(
+        f"Leaderboard refresh task will start in {seconds_until_next_hour:.0f} seconds."
+    )
+
+    await asyncio.sleep(seconds_until_next_hour)
+
+    if not refresh_leaderboards_task.is_running():
+        refresh_leaderboards_task.start()
+        print("Leaderboard refresh task started.")
 
 
 @bot.event
@@ -35,6 +73,13 @@ async def on_ready():
     await bot.change_presence(activity=discord.Game("/help"))
     synced_commands = await bot.tree.sync()
     print(f"Synced {len(synced_commands)} slash command(s).")
+
+    # leaderboard refresh is paused for now
+    # global refresh_starter_started
+
+    # if not refresh_starter_started:
+    #     refresh_starter_started = True
+    #     asyncio.create_task(start_refresh_task_on_next_hour())
 
 
 async def send_valstats(interaction, name, tag, region_value, region_name):
@@ -161,9 +206,9 @@ async def setid(
 
     if linked_user is not None and linked_user[0] != discord_user_id:
         await interaction.response.send_message(
-        "This Valorant account is already linked to another Discord user.",
-        ephemeral=True,
-    )
+            "This Valorant account is already linked to another Discord user.",
+            ephemeral=True,
+        )
         return
 
     save_player_id(discord_user_id, name, tag, region.value, puuid)
@@ -387,18 +432,21 @@ async def compare(
 
     await interaction.followup.send(embed=embed)
 
+
 @bot.tree.command(
-        name="leaderboard",
-        description="Show this week's server Valorant leaderboard."
-        )
+    name="leaderboard", description="Show this week's server Valorant leaderboard."
+)
 async def leaderboard(interaction: discord.Interaction):
-    await interaction.response.defer(thinking = True)
+    await interaction.response.defer(thinking=True)
 
-    server_id= str(interaction.guild_id)
+    await interaction.followup.send(
+        "Leaderboard is paused for now while I rework it. Use `/valstatsme` or `/compare` meanwhile."
+    )
+    return
 
-    week_start = await refresh_weekly_leaderboard(interaction.guild)
+    week_start = get_current_week_start()
 
-    leaderboard_rows = get_weekly_leaderboard(server_id, week_start)
+    leaderboard_rows = get_weekly_leaderboard(week_start)
 
     if not leaderboard_rows:
         await interaction.followup.send(
@@ -407,26 +455,35 @@ async def leaderboard(interaction: discord.Interaction):
         return
 
     leaderboard_lines = []
+    position = 1
 
-    for position, row in enumerate(leaderboard_rows, start = 1):
-        discord_user_id, wins, matches_played = row
+    for row in leaderboard_rows:
+        discord_user_id, wins, _ = row
+        member = interaction.guild.get_member(int(discord_user_id))
 
-        if position == 1:  
-            leaderboard_lines.append(
-                f"🏆 <@{discord_user_id}> — **{wins} wins**"
-            )
+        if member is None:
+            try:
+                member = await interaction.guild.fetch_member(int(discord_user_id))
+            except discord.NotFound:
+                continue
+
+        if position == 1:
+            leaderboard_lines.append(f"🏆 <@{discord_user_id}> — **{wins} wins**")
         elif position == 2:
-          leaderboard_lines.append(
-                f"🥈 <@{discord_user_id}> — **{wins} wins**"
-            )
+            leaderboard_lines.append(f"🥈 <@{discord_user_id}> — **{wins} wins**")
         elif position == 3:
-           leaderboard_lines.append(
-                f"🥉 <@{discord_user_id}> — **{wins} wins**"
-            )
+            leaderboard_lines.append(f"🥉 <@{discord_user_id}> — **{wins} wins**")
         else:
             leaderboard_lines.append(
-            f"**#{position}** <@{discord_user_id}> — **{wins} wins**"
+                f"**#{position}** <@{discord_user_id}> — **{wins} wins**"
+            )
+        position += 1
+
+    if not leaderboard_lines:
+        await interaction.followup.send(
+            "No leaderboard data yet for this server. Players need to link their Valorant ID with `/setid` first."
         )
+        return
 
     embed = discord.Embed(
         title="Weekly Valorant Leaderboard",

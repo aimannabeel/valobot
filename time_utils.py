@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+
 def get_current_week_start():
     now = datetime.now(timezone.utc)
 

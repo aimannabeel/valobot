@@ -1,5 +1,6 @@
 import aiohttp
 from urllib.parse import quote
+import asyncio
 
 from config import HENRIK_API_KEY, ssl_context
 from stats import calculate_recent_match_stats, calculate_recent_rr_change
@@ -204,6 +205,9 @@ async def fetch_weekly_competitive_matches(name, tag, region_value, week_start):
             )
             async with session.get(matches_url) as response:
                 if response.status != 200:
+                    print(
+                        f"Weekly match API failed for {name}#{tag}: {response.status}"
+                    )
                     return None
 
                 matches_payload = await response.json()
@@ -226,5 +230,5 @@ async def fetch_weekly_competitive_matches(name, tag, region_value, week_start):
                     break
 
             start += size
-
+            await asyncio.sleep(1)
     return weekly_matches
