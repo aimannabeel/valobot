@@ -32,6 +32,8 @@ from discord import app_commands
 from discord.ext import commands, tasks
 from time_utils import get_current_week_start
 
+from custom_lobby import CustomLobby, CustomLobbyView, build_lobby_embed
+
 intents = discord.Intents.default()
 
 bot = commands.Bot(command_prefix="!", intents=intents)
@@ -494,6 +496,14 @@ async def leaderboard(interaction: discord.Interaction):
     embed.set_footer(text=f"Week starting {week_start}. To participate use '/setid'")
     await interaction.followup.send(embed=embed)
 
+
+@bot.tree.command(name="lfgcustom", description="Create a Valorant custom Lobby.")
+async def lfgcustom(interaction: discord.interactions, members: int=10):
+    lobby =  CustomLobby(interaction.user, members)
+    view = CustomLobbyView(lobby)
+    embed = build_lobby_embed(lobby)
+
+    await interaction.response.send_message(embed=embed, view=view)
 
 setup_db()
 bot.run(token=DISCORD_TOKEN)

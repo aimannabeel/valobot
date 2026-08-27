@@ -40,17 +40,23 @@ async def refresh_weekly_leaderboard(guild):
 
 
 async def refresh_all_leaderboards():
+    print("Starting full leaderboard refresh...")
     week_start = get_current_week_start()
     saved_players = get_all_saved_players()
 
     for discord_user_id, name, tag, region, puuid in saved_players:
+        print(f"Refreshing {name}#{tag}...")
+
         weekly_matches = await fetch_weekly_competitive_matches(
             name, tag, region, week_start
         )
 
         if weekly_matches is None:
+            print(f"API failed for {name}#{tag}")
             await asyncio.sleep(180)
             continue
+
+        print(f"Fetched {len(weekly_matches)} matches for {name}#{tag}")
 
         for match in weekly_matches:
             match_id = match["metadata"]["match_id"]
@@ -69,5 +75,5 @@ async def refresh_all_leaderboards():
             )
 
         await asyncio.sleep(180)
-
+    print("Full leaderboard refresh complete.")
     return week_start
