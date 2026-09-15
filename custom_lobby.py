@@ -1,10 +1,18 @@
 import discord
+import random
 
 class CustomLobby:
   def __init__(self, host, required_members):
     self.host = host
     self.required_members = required_members
-    self.players = []
+    self.players = [host]
+    self.captains = []
+    self.team_a = []
+    self.team_b = []
+    self.remaining_players = []
+    self.current_pick_index = 0
+    self.pick_order = []
+    self.current_pick_index = 0
 
   def add_player(self, player):
     if player in self.players:
@@ -39,6 +47,26 @@ class CustomLobby:
 
     return "\n".join(player_mentions)
 
+  def choose_captains(self):
+    self.captains = random.sample(self.players, 2)
+
+    self.team_a = [self.captains[0]]
+    self.team_b = [self.captains[1]]
+
+    self.remaining_players = []
+
+    for player in self.players:
+      if player not in self.captains:
+        self.remaining_players.append(player)
+
+  def get_team_text(self,team):
+    player_mentions = []
+
+    for player in team:
+      player_mentions.append(player.mention)
+
+    return "\n".join(player_mentions)
+
 
 def build_lobby_embed(lobby):
   embed = discord.Embed(
@@ -54,6 +82,35 @@ def build_lobby_embed(lobby):
   )
 
   return embed
+
+def build_draft_embed(lobby):
+    embed = discord.Embed(
+        title="Captain Draft",
+        description="Captains are picking teams.",
+        color=discord.Color.blue(),
+    )
+
+    embed.add_field(
+        name=f"Team A Captain: {lobby.captains[0].display_name}",
+        value=lobby.get_team_text(lobby.team_a),
+        inline=True,
+    )
+
+    embed.add_field(
+        name=f"Team B Captain: {lobby.captains[1].display_name}",
+        value=lobby.get_team_text(lobby.team_b),
+        inline=True,
+    )
+
+    embed.add_field(
+        name="Remaining Players",
+        value=lobby.get_team_text(lobby.remaining_players)
+        if lobby.remaining_players
+        else "No players remaining.",
+        inline=False,
+    )
+
+    return embed
 
 class CustomLobbyView(discord.ui.View):
   def __init__(self, lobby):
@@ -90,3 +147,27 @@ class CustomLobbyView(discord.ui.View):
     embed = build_lobby_embed(self.lobby)
 
     await interaction.response.edit_message(embed=embed, view=self)
+
+  @discord.ui.button(label="Start", style=discord.ButtonStyle.blurple)
+  async def start_button(self, interaction, button):
+    if interaction.user != self.lobby.host:
+      await interaction.response.send_message(
+        "Only the lobby host can start this custom.",
+        ephemeral=True,
+      )
+      return
+
+    if len(self.lobby.players) < 2:
+      await interaction.response.send_message(
+        "Need at least 2 players to start.",
+        ephemeral=True,
+      )
+      return
+
+    for child in self.children:
+      child.disabled = True
+
+    embed = build_lobby_embed(self.lobby)
+
+    await interaction.response.edit_message(embed=embed, view=self)
+    await interaction.followup.send("Lobby started! Captain draft coming next.")
